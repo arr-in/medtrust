@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { seedConsortiumData, STAKEHOLDERS } from './seed_data.js';
+import { initOffChainDB } from './offchain_db.js';
 import prescriptionRoutes from './routes/prescription.routes.js';
 import drugRoutes from './routes/drug.routes.js';
 import gatewayRoutes from './routes/gateway.routes.js';
@@ -14,8 +15,14 @@ const PORT = process.env.PORT || 5001;
 app.use(cors());
 app.use(express.json());
 
-// Initialize consortium seed data
-seedConsortiumData();
+// Initialize off-chain MongoDB store & seed consortium data
+initOffChainDB().then(() => {
+  seedConsortiumData();
+}).catch(err => {
+  console.warn("MongoDB init notice:", err.message);
+  seedConsortiumData();
+});
+
 
 // Routes
 app.use('/api/prescriptions', prescriptionRoutes);

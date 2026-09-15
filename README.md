@@ -13,7 +13,7 @@ A pharmaceutical dispensing event depends on two independent claims being true s
 
 In existing healthcare distribution networks (including India's CDSCO / state drug distribution chain), these checks operate in disconnected silos. Forged prescriptions can be filled with genuine medications, and genuine prescriptions can be filled with counterfeit drugs.
 
-**MedTrust** solves this by unifying both verification tracks into a single, permissioned Hyperledger Fabric blockchain architecture coordinated by an **Atomic Gateway Contract**.
+**MedTrust** solves this by unifying both verification tracks into a Fabric-semantics-compatible permissioned blockchain architecture coordinated by an **Atomic Gateway Contract**. *(Note: The backend runs a disk-persistent state-machine ledger simulation with CouchDB state model & MongoDB off-chain store; chaincode in `chaincode/` is Fabric-ready for deployment).*
 
 ---
 
@@ -64,13 +64,13 @@ In existing healthcare distribution networks (including India's CDSCO / state dr
 
 | Layer | Technology | Specification / Justification |
 | :--- | :--- | :--- |
-| **Blockchain Platform** | Hyperledger Fabric (v2.5) | Permissioned consortium model for licensed stakeholders; gas-free deterministic execution. |
-| **Smart Contracts** | Go (Chaincode) | Native Fabric Contract API (`fabric-contract-api-go`) providing strong type safety and low latency. |
-| **State Database** | CouchDB | Document-oriented world state for rapid key-value and rich JSON querying. |
-| **Off-Chain Audit Store**| MongoDB-compatible store | Secure off-chain storage for human-readable prescription info; zero patient PII on-chain. |
+| **Blockchain Platform** | Hyperledger Fabric Compatible | Fabric-semantics-compatible ledger simulation backed by persistent disk storage. |
+| **Smart Contracts** | Go (Chaincode) | Native Fabric Contract API (`fabric-contract-api-go`) in `chaincode/` ready for peer deployment. |
+| **State Database** | Persistent Key-Value Store | Document-oriented world state providing CouchDB-style rapid key-value querying. |
+| **Off-Chain Audit Store**| MongoDB | MongoDB off-chain store for human-readable prescription info; zero patient PII on-chain. |
 | **Cryptographic Engine** | ECDSA (`secp256r1`) + SHA-256 | Digital signatures and salted prescription hashes adhering to India's DPDP Act (2023) and GDPR. |
-| **Gateway & Backend** | Node.js / Express | Verification gateway, REST API, and X.509 certificate authority abstraction. |
-| **Frontend UI** | React 18 + Vite | Minimalist, dark-slate healthcare interface with responsive dual-scanner terminal and live telemetry. |
+| **Gateway & Backend** | Node.js / Express | Verification gateway, REST API, benchmark evaluator, and X.509 certificate authority abstraction. |
+| **Frontend UI** | React 19 + Vite | Minimalist healthcare interface with webcam QR/barcode scanner terminal and live Recharts telemetry. |
 
 ---
 

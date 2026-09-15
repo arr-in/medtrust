@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Blocks, Hash, Clock, ShieldCheck, ChevronDown, ChevronRight, Layers } from 'lucide-react';
+import { Blocks, Hash, Clock, ShieldCheck, ChevronDown, ChevronRight, Layers, BarChart2 } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { getDRALedger } from '../services/api';
 
 export default function LedgerExplorer() {
@@ -28,6 +29,12 @@ export default function LedgerExplorer() {
     setExpandedHeight(expandedHeight === height ? null : height);
   };
 
+  const chartData = ledgerData?.blocks ? [...ledgerData.blocks].reverse().map(b => ({
+    block: `#${b.height}`,
+    type: b.transactions[0]?.type || 'TX',
+    txCount: b.txCount || 1,
+  })) : [];
+
   return (
     <div className="portal-container">
       <div className="portal-banner">
@@ -51,6 +58,30 @@ export default function LedgerExplorer() {
           <span>SHA-256 Block Hashing & Merkle Integrity</span>
         </div>
       </div>
+
+      {/* Block Activity Recharts Section */}
+      {chartData.length > 0 && (
+        <div className="panel-card mb-6">
+          <div className="panel-header">
+            <BarChart2 size={18} className="text-emerald" />
+            <h3 className="panel-title">Immutable Block Production Timeline</h3>
+          </div>
+          <div className="h-48 w-full pt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="block" stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }}
+                  itemStyle={{ color: '#38bdf8' }}
+                />
+                <Bar dataKey="txCount" name="Transactions Committed" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {ledgerData && (
         <div className="panel-card">

@@ -12,10 +12,12 @@ import {
   Building2,
   KeyRound,
   FileText,
-  AlertTriangle
+  AlertTriangle,
+  Camera
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { previewGatewayCheck, dispenseGateway } from '../services/api';
+import WebcamScannerModal from './WebcamScannerModal';
 
 export default function PharmacistPOS({ prescriptions = [], batches = [], onUpdate }) {
   const [rxInput, setRxInput] = useState('RX-2026-001-ACTIVE');
@@ -26,6 +28,9 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
   const [dispenseResult, setDispenseResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Scanner modal state
+  const [scannerMode, setScannerMode] = useState(null); // 'rx' | 'batch' | null
 
   // Quick preset test cases
   const presets = [
@@ -118,6 +123,17 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
 
   return (
     <div className="pos-terminal-layout">
+      {/* Scanner Modal */}
+      <WebcamScannerModal
+        isOpen={scannerMode !== null}
+        onClose={() => setScannerMode(null)}
+        targetName={scannerMode === 'rx' ? 'Prescription QR Code' : 'Physical Drug Barcode'}
+        onScanSuccess={(val) => {
+          if (scannerMode === 'rx') setRxInput(val);
+          if (scannerMode === 'batch') setBatchInput(val);
+        }}
+      />
+
       {/* Top Banner: Pharmacy Terminal Identity */}
       <div className="terminal-header-card">
         <div className="terminal-id-badge">
@@ -175,15 +191,26 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
           </div>
           <div className="scan-input-group">
             <label className="input-field-label">Prescription Transaction ID / Hash</label>
-            <div className="input-with-icon">
-              <FileText size={16} className="input-left-icon" />
-              <input
-                type="text"
-                className="text-input font-mono"
-                placeholder="e.g. RX-2026-001-ACTIVE"
-                value={rxInput}
-                onChange={(e) => setRxInput(e.target.value)}
-              />
+            <div className="flex gap-2">
+              <div className="input-with-icon flex-1">
+                <FileText size={16} className="input-left-icon" />
+                <input
+                  type="text"
+                  className="text-input font-mono"
+                  placeholder="e.g. RX-2026-001-ACTIVE"
+                  value={rxInput}
+                  onChange={(e) => setRxInput(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setScannerMode('rx')}
+                className="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 rounded-lg flex items-center gap-1.5 text-xs font-semibold transition"
+                title="Scan Prescription QR via Webcam"
+              >
+                <Camera size={16} />
+                <span>Webcam</span>
+              </button>
             </div>
           </div>
           {/* Quick Select dropdown from seeded Rx */}
@@ -221,15 +248,26 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
           </div>
           <div className="scan-input-group">
             <label className="input-field-label">Physical Drug Batch Serial ID</label>
-            <div className="input-with-icon">
-              <Barcode size={16} className="input-left-icon" />
-              <input
-                type="text"
-                className="text-input font-mono"
-                placeholder="e.g. BATCH-CIPLA-AZI-2026-01"
-                value={batchInput}
-                onChange={(e) => setBatchInput(e.target.value)}
-              />
+            <div className="flex gap-2">
+              <div className="input-with-icon flex-1">
+                <Barcode size={16} className="input-left-icon" />
+                <input
+                  type="text"
+                  className="text-input font-mono"
+                  placeholder="e.g. BATCH-CIPLA-AZI-2026-01"
+                  value={batchInput}
+                  onChange={(e) => setBatchInput(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setScannerMode('batch')}
+                className="px-3 py-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border border-cyan-500/40 rounded-lg flex items-center gap-1.5 text-xs font-semibold transition"
+                title="Scan Drug Barcode via Webcam"
+              >
+                <Camera size={16} />
+                <span>Webcam</span>
+              </button>
             </div>
           </div>
           {/* Quick Select dropdown from seeded batches */}

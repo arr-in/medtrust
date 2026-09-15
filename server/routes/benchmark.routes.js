@@ -1,11 +1,11 @@
 import express from 'express';
 import { db } from '../ledger_db.js';
-import { verifyECDSA, computePrescriptionHash, signECDSA, generateSalt } from '../crypto_engine.js';
-import { STAKEHOLDERS } from '../seed_data.js';
+import { verifyECDSA } from '../crypto_engine.js';
+import { recordBenchmarkRun, getAggregateBenchmarkStats } from '../benchmark_store.js';
 
 const router = express.Router();
 
-function runSingleSimulation(prescriptionId, batchId, pharmacyId) {
+function runSingleSimulation(prescriptionId, batchId, pharmacyId, scenarioId = 'custom_check', scenarioName = 'Verification Check') {
   const t0 = process.hrtime.bigint();
   
   // Step 1: Query world state
@@ -58,7 +58,7 @@ function runSingleSimulation(prescriptionId, batchId, pharmacyId) {
   const totalMs = Number(tEnd - t0) / 1000000;
   const queryMs = Number(tQueryEnd - tQueryStart) / 1000000;
 
-  return {
+  const outcome = {
     isAuthorized,
     breachCode,
     latency: {
@@ -68,7 +68,24 @@ function runSingleSimulation(prescriptionId, batchId, pharmacyId) {
       evaluationMs: Math.max(0.01, totalMs - queryMs - tCryptoMs),
     }
   };
+
+  recordBenchmarkRun({
+    scenarioId,
+    scenarioName,
+    isAuthorized: outcome.isAuthorized,
+    breachCode: outcome.breachCode,
+    expectedOutcome: (scenarioId === 'clean' || scenarioId === 'clean_dispense') ? 'AUTHORIZED' : 'BLOCKED',
+    latency: outcome.latency,
+  });
+
+  return outcome;
 }
+
+// GET persistent aggregate benchmark statistics
+router.get('/stats', (req, res) => {
+  const stats = getAggregateBenchmarkStats();
+  res.json({ success: true, ...stats });
+});
 
 // GET pre-configured simulation scenarios
 router.get('/scenarios', (req, res) => {
@@ -143,12 +160,12 @@ router.post('/run-all', (req, res) => {
   const iterations = req.body.iterations || 20;
 
   const testDefinitions = [
-    { id: 'clean', name: 'Clean Dispense', rx: 'RX-2026-001-ACTIVE', batch: 'BATCH-CIPLA-AZI-2026-01', expectAuth: true },
-    { id: 'replay', name: 'Replay Fraud', rx: 'RX-2026-002-REPLAY', batch: 'BATCH-CIPLA-AZI-2026-01', expectAuth: false },
-    { id: 'counterfeit', name: 'Counterfeit Batch', rx: 'RX-2026-001-ACTIVE', batch: 'FAKE-BATCH-999', expectAuth: false },
+    { id: 'clean_dispense', name: 'Clean Dispense', rx: 'RX-2026-001-ACTIVE', batch: 'BATCH-CIPLA-AZI-2026-01', expectAuth: true },
+    { id: 'replay_fraud', name: 'Replay Fraud', rx: 'RX-2026-002-REPLAY', batch: 'BATCH-CIPLA-AZI-2026-01', expectAuth: false },
+    { id: 'counterfeit_batch', name: 'Counterfeit Batch', rx: 'RX-2026-001-ACTIVE', batch: 'FAKE-BATCH-999', expectAuth: false },
     { id: 'broken_custody', name: 'Broken Custody', rx: 'RX-2026-001-ACTIVE', batch: 'BATCH-SUN-PCM-2026-99', expectAuth: false },
-    { id: 'recalled', name: 'Recalled Drug', rx: 'RX-2026-001-ACTIVE', batch: 'BATCH-CIPLA-AMX-RECALLED', expectAuth: false },
-    { id: 'expired', name: 'Expired Rx', rx: 'RX-2026-003-EXPIRED', batch: 'BATCH-CIPLA-AZI-2026-01', expectAuth: false },
+    { id: 'recalled_batch', name: 'Recalled Drug', rx: 'RX-2026-001-ACTIVE', batch: 'BATCH-CIPLA-AMX-RECALLED', expectAuth: false },
+    { id: 'expired_prescription', name: 'Expired Rx', rx: 'RX-2026-003-EXPIRED', batch: 'BATCH-CIPLA-AZI-2026-01', expectAuth: false },
   ];
 
   const results = [];
@@ -162,7 +179,7 @@ router.post('/run-all', (req, res) => {
     let sampleBreach = null;
 
     for (let i = 0; i < iterations; i++) {
-      const outcome = runSingleSimulation(test.rx, test.batch, 'PHARM-APOLLO-104');
+      const outcome = runSingleSimulation(test.rx, test.batch, 'PHARM-APOLLO-104', test.id, test.name);
       latencies.push(outcome.latency.totalMs);
       cryptoLatencies.push(outcome.latency.cryptoMs);
       totalSimulations++;
@@ -207,6 +224,7 @@ router.post('/run-all', (req, res) => {
     overallAccuracy: Number(overallAccuracy.toFixed(1)),
     overallAvgLatencyMs: Number(overallAvgLatency.toFixed(3)),
     results,
+    aggregateStats: getAggregateBenchmarkStats(),
     comparisonWithPDMP: {
       medTrustPointOfSaleGate: "Point-of-sale Real-Time Cryptographic Gate (0ms false dispense window)",
       traditionalPDMP: "Centralized Retrospective Batch Audit (Hours to Months delay)",

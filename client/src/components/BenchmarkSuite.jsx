@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Gauge, Play, CheckCircle2, ShieldAlert, Cpu, BarChart3, Clock, Sparkles } from 'lucide-react';
+import { Gauge, Play, CheckCircle2, ShieldAlert, Cpu, BarChart3, Clock, Sparkles, TrendingUp } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { getBenchmarkScenarios, runBenchmarkAll } from '../services/api';
 
 export default function BenchmarkSuite() {
@@ -26,6 +27,14 @@ export default function BenchmarkSuite() {
       setRunning(false);
     }
   };
+
+  const chartData = results?.results ? results.results.map(r => ({
+    name: r.name.replace('Scenario ', '').replace('Clean Dispense', 'Clean').replace('Replay Fraud', 'Replay').replace('Counterfeit Batch', 'Counterfeit').replace('Broken Custody', 'Custody').replace('Recalled Drug', 'Recall').replace('Expired Rx', 'Expired'),
+    avgMs: r.latency.avgMs,
+    p95Ms: r.latency.p95Ms,
+    cryptoMs: r.latency.avgCryptoMs,
+    accuracy: r.accuracyPct,
+  })) : [];
 
   return (
     <div className="portal-container">
@@ -96,6 +105,50 @@ export default function BenchmarkSuite() {
             <span className="stat-label">Point-of-Sale Gate Window</span>
             <div className="stat-value text-emerald">0 ms</div>
             <span className="stat-sub">Atomic State Commit Protection</span>
+          </div>
+        </div>
+      )}
+
+      {/* Interactive Charts Section */}
+      {results && chartData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <div className="panel-card">
+            <div className="panel-header">
+              <TrendingUp size={18} className="text-cyan" />
+              <h3 className="panel-title">Verification Latency Distribution (Avg vs P95)</h3>
+            </div>
+            <div className="h-64 w-full pt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="name" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" unit="ms" />
+                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
+                  <Legend wrapperStyle={{ color: '#cbd5e1' }} />
+                  <Bar dataKey="avgMs" name="Avg Latency (ms)" fill="#38bdf8" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="p95Ms" name="P95 Latency (ms)" fill="#a855f7" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="panel-card">
+            <div className="panel-header">
+              <BarChart3 size={18} className="text-emerald" />
+              <h3 className="panel-title">Cryptographic Overhead (ECDSA secp256r1)</h3>
+            </div>
+            <div className="h-64 w-full pt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="name" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" unit="ms" />
+                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
+                  <Legend wrapperStyle={{ color: '#cbd5e1' }} />
+                  <Bar dataKey="cryptoMs" name="ECDSA Verification Time (ms)" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       )}

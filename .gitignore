@@ -9,6 +9,9 @@ build/
 .env.local
 .env.*.local
 
+# Local runtime database files
+server/data/*.json
+
 # OS & Editor files
 .DS_Store
 Thumbs.db

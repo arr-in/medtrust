@@ -1,9 +1,14 @@
 import { sha256 } from './crypto_engine.js';
 import { v4 as uuidv4 } from 'uuid';
+import { loadLedgerState, saveLedgerState } from './ledger_store.js';
+import { putOffChainPrescription as saveOffChainMongo, getOffChainPrescription as loadOffChainMongo, getAllOffChainPrescriptions as loadAllOffChainMongo } from './offchain_db.js';
+import { SimulatedLedgerAdapter } from './ledger_adapter.js';
 
 /**
- * In-Memory Verifiable Blockchain Ledger & CouchDB-Style State Store
+ * MedTrust Permissioned Blockchain Ledger & State Store Simulation
  * Maintains atomic commit semantics, state isolation, and tamper-evident block chaining.
+ * Storage Backend: Persistent JSON/Disk Store with CouchDB-style Key-Value semantics.
+ * Note: Chaincode in 'chaincode/' is Fabric-ready for deployment to live Hyperledger network.
  */
 class MedTrustLedgerDB {
   constructor() {
@@ -13,7 +18,38 @@ class MedTrustLedgerDB {
     this.incidentLogs = [];
     this.immutableBlocks = [];
     this.recalledBatches = new Set();
-    this.initGenesisBlock();
+    
+    this.loadFromDisk();
+  }
+
+  loadFromDisk() {
+    const saved = loadLedgerState();
+    if (saved && saved.immutableBlocks && saved.immutableBlocks.length > 0) {
+      console.log(`💾 Loaded persistent ledger state from disk (${saved.immutableBlocks.length} blocks, ${saved.onChainPrescriptions.length} prescriptions, ${saved.onChainBatches.length} batches).`);
+      this.immutableBlocks = saved.immutableBlocks;
+      this.incidentLogs = saved.incidentLogs || [];
+      this.recalledBatches = new Set(saved.recalledBatches || []);
+      
+      for (const rx of saved.onChainPrescriptions) {
+        this.onChainPrescriptions.set(rx.prescriptionId, rx);
+      }
+      for (const b of saved.onChainBatches) {
+        this.onChainBatches.set(b.batchId, b);
+      }
+    } else {
+      this.initGenesisBlock();
+      this.saveToDisk();
+    }
+  }
+
+  saveToDisk() {
+    saveLedgerState({
+      onChainPrescriptions: this.onChainPrescriptions,
+      onChainBatches: this.onChainBatches,
+      incidentLogs: this.incidentLogs,
+      immutableBlocks: this.immutableBlocks,
+      recalledBatches: this.recalledBatches,
+    });
   }
 
   initGenesisBlock() {
@@ -67,12 +103,14 @@ class MedTrustLedgerDB {
     };
 
     this.immutableBlocks.push(block);
+    this.saveToDisk();
     return { block, txId };
   }
 
   // --- MODULE 1: PRESCRIPTION STORE ---
   putPrescription(prescription) {
     this.onChainPrescriptions.set(prescription.prescriptionId, prescription);
+    this.saveToDisk();
   }
 
   getPrescription(prescriptionId) {
@@ -83,17 +121,30 @@ class MedTrustLedgerDB {
     return Array.from(this.onChainPrescriptions.values());
   }
 
-  putOffChainPrescription(record) {
+  async putOffChainPrescription(record) {
     this.offChainPrescriptionStore.set(record.prescriptionId, record);
+    await saveOffChainMongo(record);
   }
 
-  getOffChainPrescription(prescriptionId) {
+  async getOffChainPrescription(prescriptionId) {
+    const mongoDoc = await loadOffChainMongo(prescriptionId);
+    if (mongoDoc) return mongoDoc;
     return this.offChainPrescriptionStore.get(prescriptionId);
+  }
+
+  async getAllOffChainPrescriptions() {
+    const docs = await loadAllOffChainMongo();
+    if (docs && docs.length > 0) return docs;
+    return Array.from(this.offChainPrescriptionStore.values());
   }
 
   // --- MODULE 2: DRUG BATCH STORE ---
   putBatch(batch) {
     this.onChainBatches.set(batch.batchId, batch);
+    if (batch.isRecalled) {
+      this.recalledBatches.add(batch.batchId);
+    }
+    this.saveToDisk();
   }
 
   getBatch(batchId) {
@@ -112,6 +163,7 @@ class MedTrustLedgerDB {
       ...incident,
     };
     this.incidentLogs.unshift(entry);
+    this.saveToDisk();
     return entry;
   }
 
@@ -165,6 +217,8 @@ class MedTrustLedgerDB {
       drugName: batch.drugName,
     });
 
+    this.saveToDisk();
+
     return {
       success: true,
       txId,
@@ -178,3 +232,5 @@ class MedTrustLedgerDB {
 }
 
 export const db = new MedTrustLedgerDB();
+export const ledgerAdapter = new SimulatedLedgerAdapter(db);
+
