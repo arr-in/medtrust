@@ -1471,6 +1471,289 @@
 .font-bold { font-weight: 700; }
 .text-xs { font-size: 11px; }
 .text-sm { font-size: 13px; }
+.text-base { font-size: 15px; }
 .text-lg { font-size: 17px; }
+.mb-6 { margin-bottom: 24px; }
 
 .animate-pulse { animation: breathe 2s ease-in-out infinite; }
+.animate-spin { animation: spin 1s linear infinite; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.status-dot-offline {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--rose-500);
+}
+
+/* ==================== POS INPUT ROW & WEBCAM BUTTONS ==================== */
+.scan-input-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.scan-input-grow {
+  flex: 1;
+}
+
+.btn-webcam {
+  padding: 8px 12px;
+  border-radius: var(--radius-s);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s var(--ease-out-expo);
+  white-space: nowrap;
+}
+
+.btn-webcam-emerald {
+  background: var(--emerald-muted);
+  color: var(--emerald-500);
+  border: 1px solid var(--border-emerald);
+}
+.btn-webcam-emerald:hover {
+  background: rgba(52, 211, 153, 0.22);
+}
+
+.btn-webcam-cyan {
+  background: var(--cyan-muted);
+  color: var(--cyan-500);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+}
+.btn-webcam-cyan:hover {
+  background: rgba(34, 211, 238, 0.2);
+}
+
+/* ==================== CHARTS & BENCHMARK CONTAINERS ==================== */
+.chart-box-md {
+  height: 256px;
+  width: 100%;
+  padding-top: 16px;
+}
+
+.chart-box-sm {
+  height: 192px;
+  width: 100%;
+  padding-top: 16px;
+}
+
+/* ==================== WEBCAM SCANNER MODAL ==================== */
+.scanner-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 16px;
+  animation: fadeIn 0.2s var(--ease-out-expo);
+}
+
+.scanner-modal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-active);
+  border-radius: var(--radius-xl);
+  max-width: 520px;
+  width: 100%;
+  padding: 24px;
+  box-shadow: var(--shadow-float);
+  position: relative;
+  color: var(--text-primary);
+  animation: scaleIn 0.25s var(--ease-spring);
+}
+
+.scanner-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-primary);
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+
+.scanner-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--emerald-500);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.scanner-close-btn {
+  background: transparent;
+  color: var(--text-tertiary);
+  padding: 4px;
+  border-radius: var(--radius-s);
+  display: grid;
+  place-items: center;
+  transition: color 0.2s, background 0.2s;
+}
+.scanner-close-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.scanner-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.scanner-camera-select {
+  flex: 1;
+}
+
+.scanner-viewport {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--border-primary);
+  background: #000;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.scanner-reader-region {
+  width: 100%;
+}
+
+.scanner-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 17, 24, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.scanner-status-bar {
+  background: var(--bg-inset);
+  border-radius: var(--radius-s);
+  padding: 10px 14px;
+  border: 1px solid var(--border-primary);
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.scanner-status-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-tertiary);
+}
+
+.scanner-error-box {
+  padding: 12px 14px;
+  background: var(--rose-muted);
+  border: 1px solid var(--border-rose);
+  border-radius: var(--radius-s);
+  color: var(--rose-500);
+  font-size: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.scanner-error-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.scanner-retry-btn {
+  margin-top: 8px;
+  padding: 5px 12px;
+  background: rgba(251, 113, 133, 0.2);
+  border: 1px solid var(--border-rose);
+  color: var(--text-primary);
+  border-radius: var(--radius-s);
+  font-size: 11px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.scanner-retry-btn:hover {
+  background: rgba(251, 113, 133, 0.35);
+}
+
+.scanner-tip-text {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.scanner-fallback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.scanner-retry-btn {
+  margin-top: 0;
+}
+
+.scanner-fallback-btn {
+  padding: 5px 12px;
+  background: var(--emerald-muted);
+  border: 1px solid var(--border-emerald);
+  color: var(--emerald-500);
+  border-radius: var(--radius-s);
+  font-size: 11px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.scanner-fallback-btn:hover {
+  background: rgba(52, 211, 153, 0.25);
+}
+
+.offline-gateway-banner {
+  background: var(--rose-muted);
+  border: 1px solid var(--border-rose);
+  color: var(--rose-500);
+  padding: 12px 18px;
+  border-radius: var(--radius-m);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.offline-retry-btn {
+  padding: 6px 14px;
+  background: rgba(251, 113, 133, 0.2);
+  border: 1px solid var(--border-rose);
+  color: var(--text-primary);
+  border-radius: var(--radius-s);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.offline-retry-btn:hover {
+  background: rgba(251, 113, 133, 0.35);
+}
+

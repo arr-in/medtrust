@@ -14,9 +14,9 @@ import './App.css';
 export default function App() {
   const [activeTab, setActiveTab] = useState('pos');
   const [health, setHealth] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
   const [prescriptions, setPrescriptions] = useState([]);
   const [batches, setBatches] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     try {
@@ -26,20 +26,24 @@ export default function App() {
         getBatches(),
       ]);
       setHealth(hRes);
+      setIsOffline(false);
       setPrescriptions(rxRes.prescriptions || []);
       setBatches(batchRes.batches || []);
     } catch (err) {
+      setHealth(null);
+      setIsOffline(true);
       console.error('Failed to load initial ledger state:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(loadData, 0);
     // Auto sync state every 6 seconds
     const interval = setInterval(loadData, 6000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
 
   return (
@@ -52,6 +56,14 @@ export default function App() {
       />
 
       <main className="main-content-container">
+        {isOffline && (
+          <div className="offline-gateway-banner" role="alert">
+            <span>⚠️ <strong>Gateway Node Disconnected:</strong> Unable to reach MedTrust backend server. Displaying cached consortium state — auto-reconnecting every 6s...</span>
+            <button type="button" className="offline-retry-btn" onClick={loadData}>
+              Reconnect Now
+            </button>
+          </div>
+        )}
         {activeTab === 'pos' && (
           <PharmacistPOS
             prescriptions={prescriptions}

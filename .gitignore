@@ -9,8 +9,10 @@ build/
 .env.local
 .env.*.local
 
-# Local runtime database files
-server/data/*.json
+# Local runtime database files & keys
+server/data/
+*.pem
+*.key
 
 # OS & Editor files
 .DS_Store

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Stethoscope, Key, FileCheck, Shield, Plus, QrCode, CheckCircle, ExternalLink } from 'lucide-react';
+import { Stethoscope, Key, FileCheck, Shield, Plus, QrCode, CheckCircle } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { issuePrescription } from '../services/api';
 

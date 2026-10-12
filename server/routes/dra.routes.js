@@ -25,24 +25,26 @@ router.get('/ledger', (req, res) => {
 // POST /recall - DRA broadcasts batch recall across consortium
 router.post('/recall', (req, res) => {
   const { batchId, reason, authority = STAKEHOLDERS.dra.name } = req.body;
+  const cleanBatchId = typeof batchId === 'string' ? batchId.trim() : '';
+  const cleanReason = typeof reason === 'string' ? reason.trim() : '';
 
-  if (!batchId || !reason) {
+  if (!cleanBatchId || !cleanReason) {
     return res.status(400).json({ success: false, error: 'batchId and recall reason are required' });
   }
 
-  const batch = db.getBatch(batchId);
+  const batch = db.getBatch(cleanBatchId);
   if (!batch) {
-    return res.status(404).json({ success: false, error: `Batch ${batchId} not found on ledger` });
+    return res.status(404).json({ success: false, error: `Batch ${cleanBatchId} not found on ledger` });
   }
 
   batch.isRecalled = true;
-  batch.recallReason = reason;
+  batch.recallReason = cleanReason;
   batch.recallAuthority = authority;
   db.putBatch(batch);
 
   const { block, txId } = db.commitBlock('DRA_BATCH_RECALL_BROADCAST', {
-    batchId,
-    reason,
+    batchId: cleanBatchId,
+    reason: cleanReason,
     authority,
     timestamp: Date.now(),
   });

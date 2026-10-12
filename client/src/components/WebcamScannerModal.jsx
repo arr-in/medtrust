@@ -1,31 +1,36 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Camera, X, AlertCircle, RefreshCw, Focus } from 'lucide-react';
 
 export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, targetName = 'Barcode / QR Code' }) {
   const scannerRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  const onScanSuccessRef = useRef(onScanSuccess);
   const [errorMsg, setErrorMsg] = useState('');
   const [isStarting, setIsStarting] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
   const [cameras, setCameras] = useState([]);
   const [selectedCameraId, setSelectedCameraId] = useState('');
 
-  const stopScanner = async () => {
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    onScanSuccessRef.current = onScanSuccess;
+  }, [onClose, onScanSuccess]);
+
+  const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
       try {
         if (scannerRef.current.isScanning) {
           await scannerRef.current.stop();
         }
         await scannerRef.current.clear();
-      } catch (e) {
+      } catch {
         // Ignore stop errors
       }
       scannerRef.current = null;
     }
-    setIsScanning(false);
-  };
+  }, []);
 
-  const applyAutoTrackFocus = () => {
+  const applyAutoTrackFocus = useCallback(() => {
     if (!scannerRef.current) return;
     try {
       const track = scannerRef.current.getRunningTrack();
@@ -37,12 +42,12 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
           track.applyConstraints({ advanced: [{ focusMode: 'macro' }] }).catch(() => {});
         }
       }
-    } catch (e) {
+    } catch {
       // Ignore if focus capability API isn't supported by browser
     }
-  };
+  }, []);
 
-  const startCamera = async (cameraId) => {
+  const startCamera = useCallback(async (cameraId) => {
     setErrorMsg('');
     setIsStarting(true);
 
@@ -84,28 +89,33 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
           try {
             const parsed = JSON.parse(cleanText);
             cleanText = parsed.prescriptionId || parsed.batchId || parsed.id || cleanText;
-          } catch (e) {
+          } catch {
             // plain text
           }
           stopScanner().then(() => {
-            onScanSuccess(cleanText);
-            onClose();
+            if (onScanSuccessRef.current) onScanSuccessRef.current(cleanText);
+            if (onCloseRef.current) onCloseRef.current();
           });
         },
-        (errorMessage) => {
+        () => {
           // ignore non-critical frame scan errors
         }
       );
 
-      setIsScanning(true);
       setTimeout(applyAutoTrackFocus, 300);
     } catch (err) {
-      console.error('Camera start error:', err);
-      setErrorMsg(`Camera error: ${err.message || err}.`);
+      const raw = String(err?.message || err || '');
+      if (raw.includes('NotAllowedError') || raw.toLowerCase().includes('permission')) {
+        setErrorMsg('Camera permission was denied by the browser. Please allow camera access in the address bar or use the simulated scan fallback below.');
+      } else if (raw.includes('NotFoundError') || raw.toLowerCase().includes('device not found')) {
+        setErrorMsg('No physical webcam device was detected on this machine. You can use the simulated scan fallback below.');
+      } else {
+        setErrorMsg(`Camera unavailable: ${raw}`);
+      }
     } finally {
       setIsStarting(false);
     }
-  };
+  }, [stopScanner, applyAutoTrackFocus]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -114,7 +124,6 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
     }
 
     let isMounted = true;
-    setErrorMsg('');
 
     const timer = setTimeout(() => {
       Html5Qrcode.getCameras().then(devices => {
@@ -125,11 +134,16 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
           setSelectedCameraId(defaultCam);
           startCamera(defaultCam);
         } else {
+          setErrorMsg('No camera devices detected on this system. Use the simulated scan fallback below or retry.');
+        }
+      }).catch((err) => {
+        if (!isMounted) return;
+        const raw = String(err?.message || err || '');
+        if (raw.includes('NotAllowedError') || raw.toLowerCase().includes('permission')) {
+          setErrorMsg('Camera permission was denied. Please grant camera permission in your browser settings or use the simulated scan fallback below.');
+        } else {
           startCamera(null);
         }
-      }).catch(err => {
-        if (!isMounted) return;
-        startCamera(null);
       });
     }, 100);
 
@@ -138,15 +152,15 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
       clearTimeout(timer);
       stopScanner();
     };
-  }, [isOpen]);
+  }, [isOpen, startCamera, stopScanner]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-lg w-full p-6 shadow-2xl relative text-slate-100">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
-          <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+    <div className="scanner-modal-backdrop">
+      <div className="scanner-modal-card">
+        <div className="scanner-modal-header">
+          <div className="scanner-modal-title">
             <Camera size={20} />
             <span>Scan {targetName} via Webcam</span>
           </div>
@@ -154,16 +168,16 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
             onClick={() => {
               stopScanner().then(onClose);
             }}
-            className="text-slate-400 hover:text-white p-1 rounded-lg transition"
+            className="scanner-close-btn"
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="flex items-center gap-2 mb-3">
+        <div className="scanner-controls-row">
           {cameras.length > 1 && (
             <select
-              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-slate-200"
+              className="select-input scanner-camera-select"
               value={selectedCameraId}
               onChange={(e) => {
                 setSelectedCameraId(e.target.value);
@@ -179,7 +193,7 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
           <button
             type="button"
             onClick={applyAutoTrackFocus}
-            className="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 rounded-lg flex items-center gap-1 text-xs font-semibold transition"
+            className="btn-webcam btn-webcam-emerald"
             title="Re-trigger Continuous Focus"
           >
             <Focus size={14} />
@@ -187,40 +201,58 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
           </button>
         </div>
 
-        <div className="relative overflow-hidden rounded-lg border border-slate-800 bg-black min-h-[300px] flex items-center justify-center mb-4">
-          <div id="webcam-reader-element" className="w-full"></div>
+        <div className="scanner-viewport">
+          <div id="webcam-reader-element" className="scanner-reader-region"></div>
           {isStarting && (
-            <div className="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center gap-2 text-slate-300">
-              <RefreshCw size={24} className="animate-spin text-emerald-400" />
+            <div className="scanner-loading-overlay">
+              <RefreshCw size={24} className="animate-spin text-emerald" />
               <span className="text-xs">Initializing Camera Stream...</span>
             </div>
           )}
         </div>
 
-        <div className="bg-slate-800/60 rounded-lg p-3 border border-slate-800 text-xs text-slate-300 flex items-center justify-between mb-3">
-          <span className="flex items-center gap-1.5 text-slate-400">
-            <Focus size={13} className="text-emerald-400" /> Auto-Focus Mode:
+        <div className="scanner-status-bar">
+          <span className="scanner-status-label">
+            <Focus size={13} className="text-emerald" /> Auto-Focus Mode:
           </span>
-          <span className="font-mono text-emerald-400 font-semibold">Continuous Macro (HD 720p)</span>
+          <span className="font-mono text-emerald font-semibold">Continuous Macro (HD 720p)</span>
         </div>
 
         {errorMsg ? (
-          <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-300 text-xs flex items-start gap-2.5 mb-4">
-            <AlertCircle size={18} className="shrink-0 text-rose-400 mt-0.5" />
+          <div className="scanner-error-box">
+            <AlertCircle size={18} className="scanner-error-icon text-rose" />
             <div>
-              <div className="font-semibold text-rose-200">Webcam Notice</div>
+              <div className="font-semibold text-rose">Webcam Notice</div>
               <div>{errorMsg}</div>
-              <button
-                onClick={() => startCamera(selectedCameraId)}
-                className="mt-2 px-3 py-1 bg-rose-600/30 hover:bg-rose-600/50 text-rose-200 rounded text-xs transition transition"
-              >
-                Retry Camera
-              </button>
+              <div className="scanner-fallback-actions">
+                <button
+                  type="button"
+                  onClick={() => startCamera(selectedCameraId)}
+                  className="scanner-retry-btn"
+                >
+                  Retry Camera
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const demoVal = targetName.toLowerCase().includes('prescription')
+                      ? 'RX-2026-001-ACTIVE'
+                      : 'BATCH-CIPLA-AZI-2026-01';
+                    stopScanner().then(() => {
+                      if (onScanSuccessRef.current) onScanSuccessRef.current(demoVal);
+                      if (onCloseRef.current) onCloseRef.current();
+                    });
+                  }}
+                  className="scanner-fallback-btn"
+                >
+                  Use Demo Scan ({targetName.toLowerCase().includes('prescription') ? 'RX-2026-001-ACTIVE' : 'BATCH-CIPLA-AZI-2026-01'})
+                </button>
+              </div>
             </div>
           </div>
         ) : (
-          <div className="text-xs text-slate-400 text-center">
-            💡 Tip: Hold the QR/barcode 10-15 cm (4-6 inches) away from the camera lens and tap <strong className="text-emerald-400">Refocus</strong> if needed.
+          <div className="scanner-tip-text">
+            💡 Tip: Hold the QR/barcode 10-15 cm (4-6 inches) away from the camera lens and tap <strong className="text-emerald">Refocus</strong> if needed.
           </div>
         )}
       </div>

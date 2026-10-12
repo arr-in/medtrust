@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Landmark, ShieldAlert, AlertTriangle, Radio, CheckCircle2, ShieldCheck, Activity, Search } from 'lucide-react';
+import { Landmark, ShieldAlert, AlertTriangle, Radio } from 'lucide-react';
 import { getDRAIncidents, getDRAStats, issueDRARecall } from '../services/api';
 
 export default function DRAPanel({ onRecallIssued }) {
@@ -24,9 +24,12 @@ export default function DRAPanel({ onRecallIssued }) {
   };
 
   useEffect(() => {
-    loadDRAData();
+    const timer = setTimeout(loadDRAData, 0);
     const interval = setInterval(loadDRAData, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleBroadcastRecall = async (e) => {

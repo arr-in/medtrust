@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Factory, Plus, Barcode, CheckCircle2, ShieldAlert, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Factory, Plus, Barcode, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { registerBatch } from '../services/api';
 
 export default function ManufacturerPortal({ batches = [], onBatchCreated }) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     batchId: `BATCH-CIPLA-${Math.floor(1000 + Math.random() * 9000)}`,
     drugName: 'Azithromycin IP',
     dosage: '500mg',
@@ -11,7 +11,7 @@ export default function ManufacturerPortal({ batches = [], onBatchCreated }) {
     plantLocation: 'Verna Industrial Estate, Goa (Plant 3)',
     manufacturerId: 'MFG-CIPLA-GOA',
     expiryMonths: 18,
-  });
+  }));
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);

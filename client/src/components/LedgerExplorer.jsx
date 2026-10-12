@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Blocks, Hash, Clock, ShieldCheck, ChevronDown, ChevronRight, Layers, BarChart2 } from 'lucide-react';
+import { Blocks, Clock, ShieldCheck, ChevronDown, ChevronRight, Layers, BarChart2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { getDRALedger } from '../services/api';
 
 export default function LedgerExplorer() {
   const [ledgerData, setLedgerData] = useState(null);
   const [expandedHeight, setExpandedHeight] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   const fetchLedger = async () => {
     try {
@@ -14,15 +13,16 @@ export default function LedgerExplorer() {
       setLedgerData(data);
     } catch (err) {
       console.error('Failed to load ledger blocks:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLedger();
+    const timer = setTimeout(fetchLedger, 0);
     const interval = setInterval(fetchLedger, 3500);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
 
   const toggleExpand = (height) => {
@@ -66,7 +66,7 @@ export default function LedgerExplorer() {
             <BarChart2 size={18} className="text-emerald" />
             <h3 className="panel-title">Immutable Block Production Timeline</h3>
           </div>
-          <div className="h-48 w-full pt-4">
+          <div className="chart-box-sm">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />

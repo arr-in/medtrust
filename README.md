@@ -124,8 +124,14 @@ medtrust/
 │   ├── server.js                  # Main server entry & route mounting
 │   ├── crypto_engine.js           # ECDSA secp256r1 & salted SHA-256
 │   ├── ledger_db.js               # CouchDB state store & immutable block chain
+│   ├── ledger_store.js            # Disk persistence for on-chain ledger state
+│   ├── offchain_db.js             # MongoDB / JSON disk store for off-chain PII
+│   ├── benchmark_store.js         # Persistent benchmark run telemetry
 │   ├── seed_data.js               # Realistic Indian pharma ecosystem seeds
+│   ├── test_scenarios.js          # Full CLI test suite (crypto + scenarios A-G)
 │   ├── test_crypto.js             # Engine verification script
+│   ├── tests/
+│   │   └── run_tests.js           # 6 fraud scenario verification runner
 │   └── routes/
 │       ├── prescription.routes.js
 │       ├── drug.routes.js
@@ -151,7 +157,8 @@ medtrust/
 │           ├── DistributorPortal.jsx
 │           ├── DRAPanel.jsx
 │           ├── BenchmarkSuite.jsx
-│           └── LedgerExplorer.jsx
+│           ├── LedgerExplorer.jsx
+│           └── WebcamScannerModal.jsx
 └── README.md
 ```
 
@@ -171,6 +178,18 @@ npm start
 ```
 The server will start on port `5001` and seed the consortium identities (CDSCO, Cipla, Sun Pharma, Blue Dart, Apollo Pharmacy).
 
+#### Optional Backend Environment Variables
+- `PORT`: Backend server port (defaults to `5001`).
+- `MONGODB_URI`: MongoDB connection string for the off-chain prescription store (e.g., `mongodb://localhost:27017/medtrust`). If unset, the server starts immediately using the disk-synced JSON off-chain store (`server/data/offchain_prescriptions.json`).
+- `USE_MEMORY_MONGO`: Set `USE_MEMORY_MONGO=true` to launch an embedded `mongodb-memory-server` instance when `MONGODB_URI` is not set.
+
+#### Running Automated Tests & Resetting Demo State
+```bash
+cd server
+npm test
+npm run demo:reset   # Wipes runtime data and re-seeds clean consortium state
+```
+
 ### Step 2: Start Frontend UI
 ```bash
 cd client
@@ -178,6 +197,12 @@ npm install
 npm run dev
 ```
 Open `http://localhost:3000` in your web browser.
+
+### Presentation & Demo Materials (`demo/`)
+- [`demo/DEMO_SCRIPT.md`](demo/DEMO_SCRIPT.md): 7–10 minute click-by-click walkthrough with exact IDs and speaker notes.
+- [`demo/PRE_DEMO_CHECKLIST.md`](demo/PRE_DEMO_CHECKLIST.md): 10-minute pre-presentation commands and live fallback plans.
+- [`demo/DEMO_QA.md`](demo/DEMO_QA.md): 15 hardest technical defense Q&As and honest limitations/future work.
+- [`demo/reset_demo.js`](demo/reset_demo.js): Automated script to reset ledger and off-chain state to a clean baseline.
 
 ---
 

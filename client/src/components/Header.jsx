@@ -32,9 +32,9 @@ export default function Header({ activeTab, setActiveTab, health, onRefresh }) {
         </div>
 
         <div className="telemetry-group">
-          <div className="telemetry-pill">
-            <span className="status-dot-pulse"></span>
-            <span className="telemetry-value mono">medtrust-channel</span>
+          <div className="telemetry-pill" title={health?.status === 'ONLINE' ? `Status: ONLINE (${health.activePeers || 6} peers)` : 'Connecting to gateway...'}>
+            <span className={health?.status === 'ONLINE' ? 'status-dot-pulse' : 'status-dot-offline'}></span>
+            <span className="telemetry-value mono">{health?.channel || 'medtrust-channel'}</span>
           </div>
           <div className="telemetry-pill">
             <Cpu size={12} className="text-cyan" />

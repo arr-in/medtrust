@@ -5,7 +5,7 @@ import { verifyECDSA } from '../crypto_engine.js';
 console.log('🧪 Starting MedTrust 6 Fraud Scenarios Verification Test Suite...\n');
 
 // Seed clean data
-seedConsortiumData();
+await seedConsortiumData();
 
 const tests = [
   {

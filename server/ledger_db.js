@@ -2,7 +2,6 @@ import { sha256 } from './crypto_engine.js';
 import { v4 as uuidv4 } from 'uuid';
 import { loadLedgerState, saveLedgerState } from './ledger_store.js';
 import { putOffChainPrescription as saveOffChainMongo, getOffChainPrescription as loadOffChainMongo, getAllOffChainPrescriptions as loadAllOffChainMongo } from './offchain_db.js';
-import { SimulatedLedgerAdapter } from './ledger_adapter.js';
 
 /**
  * MedTrust Permissioned Blockchain Ledger & State Store Simulation
@@ -232,5 +231,4 @@ class MedTrustLedgerDB {
 }
 
 export const db = new MedTrustLedgerDB();
-export const ledgerAdapter = new SimulatedLedgerAdapter(db);
 

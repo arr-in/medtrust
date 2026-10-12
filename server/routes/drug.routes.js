@@ -46,16 +46,24 @@ router.post('/register', (req, res) => {
     expiryMonths = 12,
   } = req.body;
 
-  if (!batchId || !drugName || !dosage) {
-    return res.status(400).json({ success: false, error: 'Missing required batch fields' });
+  const cleanBatchId = typeof batchId === 'string' ? batchId.trim() : '';
+  const cleanDrugName = typeof drugName === 'string' ? drugName.trim() : '';
+  const cleanDosage = typeof dosage === 'string' ? dosage.trim() : '';
+  const parsedExpiryMonths = Number(expiryMonths);
+
+  if (!cleanBatchId || !cleanDrugName || !cleanDosage) {
+    return res.status(400).json({ success: false, error: 'Missing required batch fields (batchId, drugName, dosage)' });
+  }
+  if (!Number.isFinite(parsedExpiryMonths) || parsedExpiryMonths <= 0 || parsedExpiryMonths > 120) {
+    return res.status(400).json({ success: false, error: 'expiryMonths must be a number between 1 and 120' });
   }
 
-  if (db.getBatch(batchId)) {
-    return res.status(400).json({ success: false, error: `Batch ${batchId} already registered on ledger` });
+  if (db.getBatch(cleanBatchId)) {
+    return res.status(400).json({ success: false, error: `Batch ${cleanBatchId} already registered on ledger` });
   }
 
   const now = Date.now();
-  const expiryTimestamp = now + (Number(expiryMonths) * 30 * 86400000);
+  const expiryTimestamp = now + (parsedExpiryMonths * 30 * 86400000);
 
   const genesisHop = {
     transitionId: `HOP-1-GENESIS`,
@@ -67,10 +75,10 @@ router.post('/register', (req, res) => {
   };
 
   const newBatch = {
-    batchId,
-    drugName,
-    ndc: ndc || `0378-${Math.floor(1000 + Math.random() * 9000)}-01`,
-    dosage,
+    batchId: cleanBatchId,
+    drugName: cleanDrugName,
+    ndc: (typeof ndc === 'string' && ndc.trim()) || `0378-${Math.floor(1000 + Math.random() * 9000)}-01`,
+    dosage: cleanDosage,
     plantLocation,
     manufacturerId,
     mfgTimestamp: now,
@@ -84,9 +92,9 @@ router.post('/register', (req, res) => {
 
   db.putBatch(newBatch);
   const { block, txId } = db.commitBlock('BATCH_GENESIS_REGISTRATION', {
-    batchId,
-    drugName,
-    dosage,
+    batchId: cleanBatchId,
+    drugName: cleanDrugName,
+    dosage: cleanDosage,
     manufacturerId,
     plantLocation,
     expiryTimestamp,
@@ -104,22 +112,38 @@ router.post('/register', (req, res) => {
 // POST /transfer-custody - Log a multi-hop custody transfer
 router.post('/transfer-custody', (req, res) => {
   const { batchId, senderId, recipientId, recipientRole, location } = req.body;
+  const cleanBatchId = typeof batchId === 'string' ? batchId.trim() : '';
+  const cleanSenderId = typeof senderId === 'string' ? senderId.trim() : '';
+  const cleanRecipientId = typeof recipientId === 'string' ? recipientId.trim() : '';
 
-  const batch = db.getBatch(batchId);
+  if (!cleanBatchId || !cleanSenderId || !cleanRecipientId) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required custody transfer fields (batchId, senderId, recipientId)',
+    });
+  }
+  if (cleanSenderId === cleanRecipientId) {
+    return res.status(400).json({
+      success: false,
+      error: 'Sender and recipient custody nodes cannot be identical',
+    });
+  }
+
+  const batch = db.getBatch(cleanBatchId);
   if (!batch) {
-    return res.status(404).json({ success: false, error: `Batch ${batchId} not found` });
+    return res.status(404).json({ success: false, error: `Batch ${cleanBatchId} not found` });
   }
 
   if (batch.isDispensed) {
-    return res.status(400).json({ success: false, error: `Batch ${batchId} already dispensed to patient` });
+    return res.status(400).json({ success: false, error: `Batch ${cleanBatchId} already dispensed to patient` });
   }
   if (batch.isRecalled) {
-    return res.status(400).json({ success: false, error: `Batch ${batchId} is recalled by DRA, custody transfer prohibited` });
+    return res.status(400).json({ success: false, error: `Batch ${cleanBatchId} is recalled by DRA, custody transfer prohibited` });
   }
-  if (batch.currentCustodianId !== senderId) {
+  if (batch.currentCustodianId !== cleanSenderId) {
     return res.status(400).json({
       success: false,
-      error: `Custody breach: sender ${senderId} does not possess batch (current custodian is ${batch.currentCustodianId})`
+      error: `Custody breach: sender ${cleanSenderId} does not possess batch (current custodian is ${batch.currentCustodianId})`
     });
   }
 
@@ -127,28 +151,28 @@ router.post('/transfer-custody', (req, res) => {
   const hopNumber = batch.custodyHistory.length + 1;
   const hop = {
     transitionId: `HOP-${hopNumber}-TRANSFER`,
-    senderId,
-    recipientId,
-    location: location || 'Indore Logistics Corridor',
+    senderId: cleanSenderId,
+    recipientId: cleanRecipientId,
+    location: (typeof location === 'string' && location.trim()) || 'Indore Logistics Corridor',
     timestamp: now,
-    signatureHex: `CUSTODY_SIG_${senderId.slice(0, 8)}_${now}`,
+    signatureHex: `CUSTODY_SIG_${cleanSenderId.slice(0, 8)}_${now}`,
   };
 
   batch.custodyHistory.push(hop);
-  batch.currentCustodianId = recipientId;
+  batch.currentCustodianId = cleanRecipientId;
   batch.currentCustodianRole = recipientRole || 'Distributor';
 
   db.putBatch(batch);
   const { block, txId } = db.commitBlock('CUSTODY_TRANSFER_RECORDED', {
-    batchId,
-    from: senderId,
-    to: recipientId,
+    batchId: cleanBatchId,
+    from: cleanSenderId,
+    to: cleanRecipientId,
     hopNumber,
   });
 
   res.json({
     success: true,
-    message: `Custody of batch ${batchId} successfully transferred to ${recipientId}`,
+    message: `Custody of batch ${cleanBatchId} successfully transferred to ${cleanRecipientId}`,
     batch,
     txId,
     blockHeight: block.height,

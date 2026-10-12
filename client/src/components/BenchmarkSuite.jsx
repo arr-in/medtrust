@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Gauge, Play, CheckCircle2, ShieldAlert, Cpu, BarChart3, Clock, Sparkles, TrendingUp } from 'lucide-react';
+import { Gauge, Play, CheckCircle2, Cpu, BarChart3, Sparkles, TrendingUp } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { getBenchmarkScenarios, runBenchmarkAll } from '../services/api';
 
@@ -111,13 +111,13 @@ export default function BenchmarkSuite() {
 
       {/* Interactive Charts Section */}
       {results && chartData.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <div className="two-column-grid mt-6">
           <div className="panel-card">
             <div className="panel-header">
               <TrendingUp size={18} className="text-cyan" />
               <h3 className="panel-title">Verification Latency Distribution (Avg vs P95)</h3>
             </div>
-            <div className="h-64 w-full pt-4">
+            <div className="chart-box-md">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -137,7 +137,7 @@ export default function BenchmarkSuite() {
               <BarChart3 size={18} className="text-emerald" />
               <h3 className="panel-title">Cryptographic Overhead (ECDSA secp256r1)</h3>
             </div>
-            <div className="h-64 w-full pt-4">
+            <div className="chart-box-md">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />

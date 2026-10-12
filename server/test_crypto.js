@@ -23,7 +23,7 @@ const valid = verifyECDSA(keys.publicKey, hash, signature);
 console.log("Signature Valid?", valid === true ? "PASS ✅" : "FAIL ❌");
 
 // Test 2: Seed data
-seedConsortiumData();
+await seedConsortiumData();
 const rxList = db.getAllPrescriptions();
 const batchList = db.getAllBatches();
 console.log(`Prescriptions Loaded: ${rxList.length}`);
@@ -40,4 +40,23 @@ console.log("Commit Success?", commitResult.success ? "PASS ✅" : "FAIL ❌");
 console.log("Prescription State:", db.getPrescription("RX-2026-001-ACTIVE").state);
 console.log("Batch Dispensed?", db.getBatch("BATCH-CIPLA-AZI-2026-01").isDispensed);
 console.log("Blockchain Height:", db.getBlocks().length);
+
+// Restore clean seed state after test
+const rx = db.getPrescription("RX-2026-001-ACTIVE");
+const batch = db.getBatch("BATCH-CIPLA-AZI-2026-01");
+if (rx) {
+  rx.state = "Active";
+  delete rx.dispensedPharmacyId;
+  delete rx.dispensedBatchId;
+  delete rx.dispensedTimestamp;
+  db.putPrescription(rx);
+}
+if (batch) {
+  batch.isDispensed = false;
+  delete batch.dispensedPharmacyId;
+  delete batch.dispenseTimestamp;
+  batch.custodyHistory = batch.custodyHistory.filter(h => !h.transitionId.startsWith("HOP-DISPENSED"));
+  db.putBatch(batch);
+}
+
 console.log("All unit tests passed cleanly!");

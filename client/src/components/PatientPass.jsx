@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Smartphone, ShieldCheck, FileCheck, CheckCircle2, AlertCircle, Copy, Check } from 'lucide-react';
+import { Smartphone, ShieldCheck, Copy, Check } from 'lucide-react';
 
 export default function PatientPass({ prescriptions = [] }) {
   const [selectedRxId, setSelectedRxId] = useState(

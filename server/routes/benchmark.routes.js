@@ -52,6 +52,9 @@ function runSingleSimulation(prescriptionId, batchId, pharmacyId, scenarioId = '
   } else if (batch.currentCustodianId !== pharmacyId) {
     isAuthorized = false;
     breachCode = 'BROKEN_CUSTODY_CHAIN';
+  } else if (rx.drugName && batch.drugName && rx.drugName.trim().toLowerCase() !== batch.drugName.trim().toLowerCase()) {
+    isAuthorized = false;
+    breachCode = 'DRUG_MISMATCH_DETECTED';
   }
 
   const tEnd = process.hrtime.bigint();
@@ -157,7 +160,14 @@ router.get('/scenarios', (req, res) => {
 
 // POST /run-all - Run automated capstone benchmark test
 router.post('/run-all', (req, res) => {
-  const iterations = req.body.iterations || 20;
+  const rawIterations = req.body?.iterations !== undefined ? Number(req.body.iterations) : 20;
+  if (!Number.isFinite(rawIterations) || rawIterations < 1 || rawIterations > 500) {
+    return res.status(400).json({
+      success: false,
+      error: 'iterations must be a valid number between 1 and 500',
+    });
+  }
+  const iterations = Math.floor(rawIterations);
 
   const testDefinitions = [
     { id: 'clean_dispense', name: 'Clean Dispense', rx: 'RX-2026-001-ACTIVE', batch: 'BATCH-CIPLA-AZI-2026-01', expectAuth: true },
@@ -168,50 +178,108 @@ router.post('/run-all', (req, res) => {
     { id: 'expired_prescription', name: 'Expired Rx', rx: 'RX-2026-003-EXPIRED', batch: 'BATCH-CIPLA-AZI-2026-01', expectAuth: false },
   ];
 
+  // Snapshot live state of seeded records so running benchmarks after live POS dispenses/recalls
+  // still evaluates the canonical 6 fraud vectors without mutating live ledger state.
+  const rxActive = db.getPrescription('RX-2026-001-ACTIVE');
+  const rxReplay = db.getPrescription('RX-2026-002-REPLAY');
+  const rxExpired = db.getPrescription('RX-2026-003-EXPIRED');
+  const batchClean = db.getBatch('BATCH-CIPLA-AZI-2026-01');
+  const batchBroken = db.getBatch('BATCH-SUN-PCM-2026-99');
+  const batchRecalled = db.getBatch('BATCH-CIPLA-AMX-RECALLED');
+
+  const snapshot = {
+    rxActiveState: rxActive?.state,
+    rxReplayState: rxReplay?.state,
+    rxExpiredState: rxExpired?.state,
+    batchCleanDispensed: batchClean?.isDispensed,
+    batchCleanRecalled: batchClean?.isRecalled,
+    batchCleanCustodian: batchClean?.currentCustodianId,
+    batchBrokenDispensed: batchBroken?.isDispensed,
+    batchBrokenRecalled: batchBroken?.isRecalled,
+    batchBrokenCustodian: batchBroken?.currentCustodianId,
+    batchRecalledFlag: batchRecalled?.isRecalled,
+  };
+
+  if (rxActive) rxActive.state = 'Active';
+  if (rxReplay) rxReplay.state = 'Fulfilled';
+  if (rxExpired) rxExpired.state = 'Expired';
+  if (batchClean) {
+    batchClean.isDispensed = false;
+    batchClean.isRecalled = false;
+    batchClean.currentCustodianId = 'PHARM-APOLLO-104';
+  }
+  if (batchBroken) {
+    batchBroken.isDispensed = false;
+    batchBroken.isRecalled = false;
+    batchBroken.currentCustodianId = 'DIST-BLUEDART-IND';
+  }
+  if (batchRecalled) {
+    batchRecalled.isRecalled = true;
+  }
+
   const results = [];
   let totalSimulations = 0;
   let correctDecisions = 0;
 
-  for (const test of testDefinitions) {
-    const latencies = [];
-    const cryptoLatencies = [];
-    let correctCount = 0;
-    let sampleBreach = null;
+  try {
+    for (const test of testDefinitions) {
+      const latencies = [];
+      const cryptoLatencies = [];
+      let correctCount = 0;
+      let sampleBreach = null;
 
-    for (let i = 0; i < iterations; i++) {
-      const outcome = runSingleSimulation(test.rx, test.batch, 'PHARM-APOLLO-104', test.id, test.name);
-      latencies.push(outcome.latency.totalMs);
-      cryptoLatencies.push(outcome.latency.cryptoMs);
-      totalSimulations++;
+      for (let i = 0; i < iterations; i++) {
+        const outcome = runSingleSimulation(test.rx, test.batch, 'PHARM-APOLLO-104', test.id, test.name);
+        latencies.push(outcome.latency.totalMs);
+        cryptoLatencies.push(outcome.latency.cryptoMs);
+        totalSimulations++;
 
-      const isCorrect = outcome.isAuthorized === test.expectAuth;
-      if (isCorrect) {
-        correctCount++;
-        correctDecisions++;
+        const isCorrect = outcome.isAuthorized === test.expectAuth;
+        if (isCorrect) {
+          correctCount++;
+          correctDecisions++;
+        }
+        sampleBreach = outcome.breachCode;
       }
-      sampleBreach = outcome.breachCode;
+
+      latencies.sort((a, b) => a - b);
+      const avgLatency = latencies.reduce((sum, v) => sum + v, 0) / latencies.length;
+      const avgCrypto = cryptoLatencies.reduce((sum, v) => sum + v, 0) / cryptoLatencies.length;
+      const p95Latency = latencies[Math.floor(latencies.length * 0.95)] || latencies[latencies.length - 1];
+
+      results.push({
+        scenarioId: test.id,
+        name: test.name,
+        iterations,
+        accuracyPct: (correctCount / iterations) * 100,
+        expected: test.expectAuth ? 'AUTHORIZED' : 'BLOCKED',
+        sampleCode: sampleBreach || 'SUCCESS',
+        latency: {
+          minMs: Number(latencies[0].toFixed(3)),
+          avgMs: Number(avgLatency.toFixed(3)),
+          p95Ms: Number(p95Latency.toFixed(3)),
+          maxMs: Number(latencies[latencies.length - 1].toFixed(3)),
+          avgCryptoMs: Number(avgCrypto.toFixed(3)),
+        }
+      });
     }
-
-    latencies.sort((a, b) => a - b);
-    const avgLatency = latencies.reduce((sum, v) => sum + v, 0) / latencies.length;
-    const avgCrypto = cryptoLatencies.reduce((sum, v) => sum + v, 0) / cryptoLatencies.length;
-    const p95Latency = latencies[Math.floor(latencies.length * 0.95)] || latencies[latencies.length - 1];
-
-    results.push({
-      scenarioId: test.id,
-      name: test.name,
-      iterations,
-      accuracyPct: (correctCount / iterations) * 100,
-      expected: test.expectAuth ? 'AUTHORIZED' : 'BLOCKED',
-      sampleCode: sampleBreach || 'SUCCESS',
-      latency: {
-        minMs: Number(latencies[0].toFixed(3)),
-        avgMs: Number(avgLatency.toFixed(3)),
-        p95Ms: Number(p95Latency.toFixed(3)),
-        maxMs: Number(latencies[latencies.length - 1].toFixed(3)),
-        avgCryptoMs: Number(avgCrypto.toFixed(3)),
-      }
-    });
+  } finally {
+    if (rxActive && snapshot.rxActiveState !== undefined) rxActive.state = snapshot.rxActiveState;
+    if (rxReplay && snapshot.rxReplayState !== undefined) rxReplay.state = snapshot.rxReplayState;
+    if (rxExpired && snapshot.rxExpiredState !== undefined) rxExpired.state = snapshot.rxExpiredState;
+    if (batchClean) {
+      batchClean.isDispensed = snapshot.batchCleanDispensed;
+      batchClean.isRecalled = snapshot.batchCleanRecalled;
+      batchClean.currentCustodianId = snapshot.batchCleanCustodian;
+    }
+    if (batchBroken) {
+      batchBroken.isDispensed = snapshot.batchBrokenDispensed;
+      batchBroken.isRecalled = snapshot.batchBrokenRecalled;
+      batchBroken.currentCustodianId = snapshot.batchBrokenCustodian;
+    }
+    if (batchRecalled && snapshot.batchRecalledFlag !== undefined) {
+      batchRecalled.isRecalled = snapshot.batchRecalledFlag;
+    }
   }
 
   const overallAccuracy = (correctDecisions / totalSimulations) * 100;

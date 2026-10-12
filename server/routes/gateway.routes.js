@@ -100,7 +100,15 @@ function evaluateDualLayerConditions(prescriptionId, batchId, pharmacyId) {
   }
   checks.custodyChainConsistent = true;
 
-  // All 8 checks passed!
+  // Drug Mismatch Check: Prescription drug must match physical drug batch
+  if (rx.drugName && batch.drugName && rx.drugName.trim().toLowerCase() !== batch.drugName.trim().toLowerCase()) {
+    checks.failureReason = `Drug Mismatch: Prescription authorizes '${rx.drugName}', but scanned batch ${batchId} contains '${batch.drugName}'`;
+    checks.breachCode = 'DRUG_MISMATCH_DETECTED';
+    return finalizeChecks(checks, startTime);
+  }
+  checks.drugMatchesPrescription = true;
+
+  // All checks passed!
   checks.passed = true;
   return finalizeChecks(checks, startTime);
 }
@@ -114,12 +122,14 @@ function finalizeChecks(checks, startTime) {
 // POST /preview-check - Pre-flight dual-scan analysis for pharmacist POS
 router.post('/preview-check', (req, res) => {
   const { prescriptionId, batchId, pharmacyId = 'PHARM-APOLLO-104' } = req.body;
+  const cleanRxId = typeof prescriptionId === 'string' ? prescriptionId.trim() : '';
+  const cleanBatchId = typeof batchId === 'string' ? batchId.trim() : '';
 
-  if (!prescriptionId || !batchId) {
+  if (!cleanRxId || !cleanBatchId) {
     return res.status(400).json({ success: false, error: 'Both Prescription ID and Drug Batch ID are required for dual verification' });
   }
 
-  const evaluation = evaluateDualLayerConditions(prescriptionId, batchId, pharmacyId);
+  const evaluation = evaluateDualLayerConditions(cleanRxId, cleanBatchId, pharmacyId);
   res.json({
     success: true,
     evaluation,
@@ -129,12 +139,14 @@ router.post('/preview-check', (req, res) => {
 // POST /dispense - Atomic Point-of-Sale Execution Gate
 router.post('/dispense', (req, res) => {
   const { prescriptionId, batchId, pharmacyId = 'PHARM-APOLLO-104' } = req.body;
+  const cleanRxId = typeof prescriptionId === 'string' ? prescriptionId.trim() : '';
+  const cleanBatchId = typeof batchId === 'string' ? batchId.trim() : '';
 
-  if (!prescriptionId || !batchId) {
+  if (!cleanRxId || !cleanBatchId) {
     return res.status(400).json({ success: false, error: 'Both Prescription ID and Drug Batch ID are required' });
   }
 
-  const evaluation = evaluateDualLayerConditions(prescriptionId, batchId, pharmacyId);
+  const evaluation = evaluateDualLayerConditions(cleanRxId, cleanBatchId, pharmacyId);
 
   // If dual-check fails, trigger atomic reject and log security breach for DRA
   if (!evaluation.passed) {
@@ -142,8 +154,8 @@ router.post('/dispense', (req, res) => {
       eventType: 'DISPENSE_BLOCKED',
       breachCode: evaluation.breachCode,
       reason: evaluation.failureReason,
-      prescriptionId,
-      batchId,
+      prescriptionId: cleanRxId,
+      batchId: cleanBatchId,
       pharmacyId,
       severity: evaluation.breachCode.includes('COUNTERFEIT') || evaluation.breachCode.includes('RECALL') ? 'CRITICAL' : 'HIGH',
     });
@@ -160,7 +172,7 @@ router.post('/dispense', (req, res) => {
 
   // If dual-check passes, execute single atomic commit
   try {
-    const commitResult = db.atomicDispenseCommit({ prescriptionId, batchId, pharmacyId });
+    const commitResult = db.atomicDispenseCommit({ prescriptionId: cleanRxId, batchId: cleanBatchId, pharmacyId });
     res.json({
       success: true,
       authorized: true,

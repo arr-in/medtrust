@@ -7,10 +7,8 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  ArrowRight,
   Zap,
   Building2,
-  KeyRound,
   FileText,
   AlertTriangle,
   Camera
@@ -22,7 +20,7 @@ import WebcamScannerModal from './WebcamScannerModal';
 export default function PharmacistPOS({ prescriptions = [], batches = [], onUpdate }) {
   const [rxInput, setRxInput] = useState('RX-2026-001-ACTIVE');
   const [batchInput, setBatchInput] = useState('BATCH-CIPLA-AZI-2026-01');
-  const [pharmacyId, setPharmacyId] = useState('PHARM-APOLLO-104');
+  const pharmacyId = 'PHARM-APOLLO-104';
   
   const [preview, setPreview] = useState(null);
   const [dispenseResult, setDispenseResult] = useState(null);
@@ -81,11 +79,11 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
 
   // Run live pre-flight check when inputs change
   useEffect(() => {
-    if (!rxInput.trim() || !batchInput.trim()) {
-      setPreview(null);
-      return;
-    }
     const timer = setTimeout(async () => {
+      if (!rxInput.trim() || !batchInput.trim()) {
+        setPreview(null);
+        return;
+      }
       try {
         const res = await previewGatewayCheck(rxInput.trim(), batchInput.trim(), pharmacyId);
         setPreview(res.evaluation);
@@ -94,7 +92,7 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [rxInput, batchInput, pharmacyId]);
+  }, [rxInput, batchInput, pharmacyId, prescriptions, batches]);
 
   // Execute atomic dispense
   const handleDispense = async () => {
@@ -191,8 +189,8 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
           </div>
           <div className="scan-input-group">
             <label className="input-field-label">Prescription Transaction ID / Hash</label>
-            <div className="flex gap-2">
-              <div className="input-with-icon flex-1">
+            <div className="scan-input-row">
+              <div className="input-with-icon scan-input-grow">
                 <FileText size={16} className="input-left-icon" />
                 <input
                   type="text"
@@ -205,7 +203,7 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
               <button
                 type="button"
                 onClick={() => setScannerMode('rx')}
-                className="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 rounded-lg flex items-center gap-1.5 text-xs font-semibold transition"
+                className="btn-webcam btn-webcam-emerald"
                 title="Scan Prescription QR via Webcam"
               >
                 <Camera size={16} />
@@ -248,8 +246,8 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
           </div>
           <div className="scan-input-group">
             <label className="input-field-label">Physical Drug Batch Serial ID</label>
-            <div className="flex gap-2">
-              <div className="input-with-icon flex-1">
+            <div className="scan-input-row">
+              <div className="input-with-icon scan-input-grow">
                 <Barcode size={16} className="input-left-icon" />
                 <input
                   type="text"
@@ -262,7 +260,7 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
               <button
                 type="button"
                 onClick={() => setScannerMode('batch')}
-                className="px-3 py-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border border-cyan-500/40 rounded-lg flex items-center gap-1.5 text-xs font-semibold transition"
+                className="btn-webcam btn-webcam-cyan"
                 title="Scan Drug Barcode via Webcam"
               >
                 <Camera size={16} />
@@ -363,6 +361,10 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
                 <li className={`check-item ${preview.custodyChainConsistent ? 'item-pass' : 'item-fail'}`}>
                   {preview.custodyChainConsistent ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
                   <span>Unbroken Custody: Verified at Current Pharmacy</span>
+                </li>
+                <li className={`check-item ${preview.drugMatchesPrescription ? 'item-pass' : 'item-fail'}`}>
+                  {preview.drugMatchesPrescription ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
+                  <span>Prescribed Medication Matches Physical Batch</span>
                 </li>
               </ul>
             </div>

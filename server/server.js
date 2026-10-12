@@ -15,15 +15,6 @@ const PORT = process.env.PORT || 5001;
 app.use(cors());
 app.use(express.json());
 
-// Initialize off-chain MongoDB store & seed consortium data
-initOffChainDB().then(() => {
-  seedConsortiumData();
-}).catch(err => {
-  console.warn("MongoDB init notice:", err.message);
-  seedConsortiumData();
-});
-
-
 // Routes
 app.use('/api/prescriptions', prescriptionRoutes);
 app.use('/api/drugs', drugRoutes);
@@ -61,6 +52,18 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 MedTrust Blockchain Gateway Engine listening on port ${PORT}`);
-});
+// Initialize off-chain store & seed consortium data BEFORE listening
+async function startServer() {
+  try {
+    await initOffChainDB();
+  } catch (err) {
+    console.warn("MongoDB init notice:", err.message);
+  }
+  await seedConsortiumData();
+
+  app.listen(PORT, () => {
+    console.log(`🚀 MedTrust Blockchain Gateway Engine listening on port ${PORT}`);
+  });
+}
+
+startServer();

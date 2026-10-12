@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Truck, ArrowRight, ShieldCheck, MapPin, CheckCircle2, History, AlertCircle } from 'lucide-react';
+import { Truck, ArrowRight, MapPin, CheckCircle2, History } from 'lucide-react';
 import { transferCustody } from '../services/api';
 
 export default function DistributorPortal({ batches = [], onCustodyTransferred }) {

@@ -28,15 +28,40 @@ function ensureDataDir() {
   }
 }
 
+function loadDiskBackupToFallback() {
+  if (fs.existsSync(BACKUP_FILE)) {
+    try {
+      const raw = fs.readFileSync(BACKUP_FILE, 'utf-8');
+      const records = JSON.parse(raw);
+      for (const r of records) {
+        inMemoryFallback.set(r.prescriptionId, r);
+      }
+    } catch {
+      // ignore
+    }
+  }
+}
+
+// Preload disk backup synchronously so off-chain reads work immediately even before initOffChainDB()
+loadDiskBackupToFallback();
+
 export async function initOffChainDB() {
   if (isInitialized) return;
   
   ensureDataDir();
 
+  let uri = process.env.MONGODB_URI;
+  const useMemoryMongo = process.env.USE_MEMORY_MONGO === 'true';
+
+  if (!uri && !useMemoryMongo) {
+    loadDiskBackupToFallback();
+    isInitialized = true;
+    console.log(`💾 Off-Chain Store Ready (JSON disk store: ${inMemoryFallback.size} records loaded).`);
+    return;
+  }
+
   try {
-    // Attempt local MongoDB instance first, or fallback to MongoMemoryServer
-    let uri = process.env.MONGODB_URI;
-    if (!uri) {
+    if (!uri && useMemoryMongo) {
       console.log("🍃 Starting embedded MongoDB instance (mongodb-memory-server)...");
       const mongod = await MongoMemoryServer.create();
       uri = mongod.getUri();
@@ -62,17 +87,8 @@ export async function initOffChainDB() {
     console.log("✅ MongoDB Off-Chain Store Connected & Ready.");
   } catch (err) {
     console.warn("⚠️ Could not initialize MongoDB instance, using disk-synced fallback:", err.message);
-    if (fs.existsSync(BACKUP_FILE)) {
-      try {
-        const raw = fs.readFileSync(BACKUP_FILE, 'utf-8');
-        const records = JSON.parse(raw);
-        for (const r of records) {
-          inMemoryFallback.set(r.prescriptionId, r);
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
+    loadDiskBackupToFallback();
+    isInitialized = true;
   }
 }
 

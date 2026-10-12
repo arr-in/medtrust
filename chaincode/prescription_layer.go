@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"time"
 
@@ -24,23 +25,52 @@ const (
 // PrescriptionRecord models the privacy-preserving on-chain commitment (Module 1).
 // Zero Personally Identifiable Information (PII) is stored on-chain (DPDP Act & GDPR).
 type PrescriptionRecord struct {
-	PrescriptionID      string            `json:"prescriptionId"`
-	SaltedHash          string            `json:"saltedHash"` // 256-bit SHA-256 identifier
-	DoctorID            string            `json:"doctorId"`
-	DoctorLicense       string            `json:"doctorLicense"`
-	DoctorPublicKeyPEM  string            `json:"doctorPublicKeyPem"`
-	DoctorECDSASignature string           `json:"doctorEcdsaSignature"`
-	IssueTimestamp      int64             `json:"issueTimestamp"`
-	ExpiryTimestamp     int64             `json:"expiryTimestamp"`
-	State               PrescriptionState `json:"state"`
-	DispensedPharmacyID string            `json:"dispensedPharmacyId,omitempty"`
-	DispensedBatchID    string            `json:"dispensedBatchId,omitempty"`
-	DispensedTimestamp  int64             `json:"dispensedTimestamp,omitempty"`
+	PrescriptionID       string            `json:"prescriptionId"`
+	SaltedHash           string            `json:"saltedHash"` // 256-bit SHA-256 identifier
+	DoctorID             string            `json:"doctorId"`
+	DoctorLicense        string            `json:"doctorLicense"`
+	DoctorPublicKeyPEM   string            `json:"doctorPublicKeyPem"`
+	DoctorECDSASignature string            `json:"doctorEcdsaSignature"`
+	IssueTimestamp       int64             `json:"issueTimestamp"`
+	ExpiryTimestamp      int64             `json:"expiryTimestamp"`
+	State                PrescriptionState `json:"state"`
+	DispensedPharmacyID  string            `json:"dispensedPharmacyId,omitempty"`
+	DispensedBatchID     string            `json:"dispensedBatchId,omitempty"`
+	DispensedTimestamp   int64             `json:"dispensedTimestamp,omitempty"`
 }
 
 // PrescriptionContract implements Module 1 of the MedTrust architecture
 type PrescriptionContract struct {
 	contractapi.Contract
+}
+
+// verifyECDSASignature verifies a hex-encoded ASN.1 DER ECDSA signature against a SPKI PEM public key and data string
+func verifyECDSASignature(publicKeyPEM string, dataString string, signatureHex string) error {
+	block, _ := pem.Decode([]byte(publicKeyPEM))
+	if block == nil {
+		return fmt.Errorf("failed to decode doctor public key PEM")
+	}
+
+	pubInterface, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse doctor PKIX public key: %v", err)
+	}
+
+	ecdsaPub, ok := pubInterface.(*ecdsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("public key is not an ECDSA key")
+	}
+
+	sigBytes, err := hex.DecodeString(signatureHex)
+	if err != nil {
+		return fmt.Errorf("invalid signature hex encoding: %v", err)
+	}
+
+	digest := sha256.Sum256([]byte(dataString))
+	if !ecdsa.VerifyASN1(ecdsaPub, digest[:], sigBytes) {
+		return fmt.Errorf("ECDSA signature verification failed for doctor public key")
+	}
+	return nil
 }
 
 // IssuePrescription writes a new salted prescription hash to the ledger with Active state
@@ -62,11 +92,20 @@ func (pc *PrescriptionContract) IssuePrescription(
 		return fmt.Errorf("prescription with ID %s already registered", prescriptionID)
 	}
 
+	if err := verifyECDSASignature(doctorPublicKeyPEM, saltedHash, signatureHex); err != nil {
+		return fmt.Errorf("invalid doctor signature on prescription issuance: %v", err)
+	}
+
 	txTime, err := ctx.GetStub().GetTxTimestamp()
 	if err != nil {
 		return fmt.Errorf("failed to get transaction timestamp: %v", err)
 	}
-	nowUnix := txTime.GetSeconds()
+	nowMillis := txTime.GetSeconds()*1000 + int64(txTime.GetNanos()/1e6)
+
+	// Normalize expiryTimestamp to milliseconds if passed in seconds
+	if expiryTimestamp < 1e12 {
+		expiryTimestamp = expiryTimestamp * 1000
+	}
 
 	record := PrescriptionRecord{
 		PrescriptionID:       prescriptionID,
@@ -75,7 +114,7 @@ func (pc *PrescriptionContract) IssuePrescription(
 		DoctorLicense:        doctorLicense,
 		DoctorPublicKeyPEM:   doctorPublicKeyPEM,
 		DoctorECDSASignature: signatureHex,
-		IssueTimestamp:       nowUnix,
+		IssueTimestamp:       nowMillis,
 		ExpiryTimestamp:      expiryTimestamp,
 		State:                StateActive,
 	}
@@ -130,15 +169,24 @@ func (pc *PrescriptionContract) VerifyPrescriptionConditions(ctx contractapi.Tra
 	}
 
 	txTime, err := ctx.GetStub().GetTxTimestamp()
-	var currentSeconds int64
+	var currentMillis int64
 	if err == nil && txTime != nil {
-		currentSeconds = txTime.GetSeconds()
+		currentMillis = txTime.GetSeconds()*1000 + int64(txTime.GetNanos()/1e6)
 	} else {
-		currentSeconds = time.Now().Unix()
+		currentMillis = time.Now().UnixMilli()
 	}
 
-	if currentSeconds > record.ExpiryTimestamp {
-		return nil, fmt.Errorf("prescription has expired at %d (current time: %d)", record.ExpiryTimestamp, currentSeconds)
+	expiryMillis := record.ExpiryTimestamp
+	if expiryMillis < 1e12 {
+		expiryMillis = expiryMillis * 1000
+	}
+
+	if currentMillis > expiryMillis {
+		return nil, fmt.Errorf("prescription has expired at %d (current time: %d)", expiryMillis, currentMillis)
+	}
+
+	if err := verifyECDSASignature(record.DoctorPublicKeyPEM, record.SaltedHash, record.DoctorECDSASignature); err != nil {
+		return nil, fmt.Errorf("invalid doctor ECDSA signature: %v", err)
 	}
 
 	return record, nil
