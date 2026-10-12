@@ -6,7 +6,6 @@ import PatientPass from './components/PatientPass';
 import ManufacturerPortal from './components/ManufacturerPortal';
 import DistributorPortal from './components/DistributorPortal';
 import DRAPanel from './components/DRAPanel';
-import BenchmarkSuite from './components/BenchmarkSuite';
 import LedgerExplorer from './components/LedgerExplorer';
 import { getHealth, getPrescriptions, getBatches } from './services/api';
 import './App.css';
@@ -123,10 +122,6 @@ export default function App() {
             onRecallIssued={loadData}
             onNavigate={setActiveTab}
           />
-        )}
-
-        {activeTab === 'benchmark' && (
-          <BenchmarkSuite />
         )}
 
         {activeTab === 'ledger' && (
