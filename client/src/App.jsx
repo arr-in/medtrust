@@ -13,10 +13,15 @@ import './App.css';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('pos');
+  const [theme, setTheme] = useState('light');
   const [health, setHealth] = useState(null);
   const [isOffline, setIsOffline] = useState(false);
   const [prescriptions, setPrescriptions] = useState([]);
   const [batches, setBatches] = useState([]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   const loadData = async () => {
     try {
@@ -38,13 +43,16 @@ export default function App() {
 
   useEffect(() => {
     const timer = setTimeout(loadData, 0);
-    // Auto sync state every 6 seconds
     const interval = setInterval(loadData, 6000);
     return () => {
       clearTimeout(timer);
       clearInterval(interval);
     };
   }, []);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+  };
 
   return (
     <div className="app-shell">
@@ -53,22 +61,28 @@ export default function App() {
         setActiveTab={setActiveTab}
         health={health}
         onRefresh={loadData}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       <main className="main-content-container">
         {isOffline && (
           <div className="offline-gateway-banner" role="alert">
-            <span>⚠️ <strong>Gateway Node Disconnected:</strong> Unable to reach MedTrust backend server. Displaying cached consortium state — auto-reconnecting every 6s...</span>
+            <span>
+              <strong>Offline:</strong> Cannot reach the MedTrust server. Showing last loaded data — retrying automatically every 6 seconds.
+            </span>
             <button type="button" className="offline-retry-btn" onClick={loadData}>
-              Reconnect Now
+              Retry Now
             </button>
           </div>
         )}
+
         {activeTab === 'pos' && (
           <PharmacistPOS
             prescriptions={prescriptions}
             batches={batches}
             onUpdate={loadData}
+            onNavigate={setActiveTab}
           />
         )}
 
@@ -76,17 +90,22 @@ export default function App() {
           <DoctorPortal
             prescriptions={prescriptions}
             onPrescriptionCreated={loadData}
+            onNavigate={setActiveTab}
           />
         )}
 
         {activeTab === 'patient' && (
-          <PatientPass prescriptions={prescriptions} />
+          <PatientPass
+            prescriptions={prescriptions}
+            onNavigate={setActiveTab}
+          />
         )}
 
         {activeTab === 'manufacturer' && (
           <ManufacturerPortal
             batches={batches}
             onBatchCreated={loadData}
+            onNavigate={setActiveTab}
           />
         )}
 
@@ -94,11 +113,16 @@ export default function App() {
           <DistributorPortal
             batches={batches}
             onCustodyTransferred={loadData}
+            onNavigate={setActiveTab}
           />
         )}
 
         {activeTab === 'dra' && (
-          <DRAPanel onRecallIssued={loadData} />
+          <DRAPanel
+            batches={batches}
+            onRecallIssued={loadData}
+            onNavigate={setActiveTab}
+          />
         )}
 
         {activeTab === 'benchmark' && (
@@ -112,15 +136,11 @@ export default function App() {
 
       <footer className="footer-bar">
         <div className="footer-content">
-          <div className="footer-left">
-            <span className="font-semibold text-emerald">MedTrust Consortium</span>
-            <span className="footer-divider">•</span>
-            <span>7th Sem Capstone Project</span>
-            <span className="footer-divider">•</span>
-            <span>Department of Computer Engineering, NMIMS Indore</span>
+          <div>
+            <strong className="text-primary">MedTrust</strong> • Prescription & Drug Verification System • NMIMS Indore
           </div>
-          <div className="footer-right font-mono text-xs text-muted">
-            Authors: Abhishek Soni • Arin Jain • Neelansh Dosi
+          <div className="font-mono">
+            Abhishek Soni • Arin Jain • Neelansh Dosi
           </div>
         </div>
       </footer>

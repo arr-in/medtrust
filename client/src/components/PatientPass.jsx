@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Smartphone, ShieldCheck, Copy, Check } from 'lucide-react';
+import { Copy, Check, ArrowRight } from 'lucide-react';
 
-export default function PatientPass({ prescriptions = [] }) {
+export default function PatientPass({ prescriptions = [], onNavigate }) {
   const [selectedRxId, setSelectedRxId] = useState(
     prescriptions[0]?.prescriptionId || 'RX-2026-001-ACTIVE'
   );
@@ -15,159 +15,156 @@ export default function PatientPass({ prescriptions = [] }) {
     if (selectedRx?.saltedHash) {
       navigator.clipboard.writeText(selectedRx.saltedHash);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 1800);
     }
   };
 
   if (!selectedRx) {
     return (
-      <div className="portal-container">
-        <div className="empty-placeholder">No prescriptions available yet.</div>
+      <div className="page-stack">
+        <div className="empty-state">No prescriptions available yet.</div>
       </div>
     );
   }
 
   return (
-    <div className="portal-container">
-      <div className="portal-banner">
-        <div className="banner-profile">
-          <div className="avatar-box avatar-patient">
-            <Smartphone size={24} />
-          </div>
-          <div>
-            <div className="banner-title-row">
-              <h2 className="banner-title">Patient Digital Prescription Pass</h2>
-              <span className="badge-patient">Patient Wallet</span>
-            </div>
-            <p className="banner-sub">
-              Present this QR pass at any certified MedTrust pharmacy counter for dual-layer verification.
-            </p>
-          </div>
+    <div className="page-stack">
+      <div className="page-header">
+        <div>
+          <h2 className="page-title">Patient Digital Pass</h2>
+          <p className="page-subtitle">
+            Present this QR code at the pharmacy counter to verify and pick up medication
+          </p>
         </div>
 
-        <div className="selector-group">
-          <span className="text-muted text-xs">Switch Prescription:</span>
+        <div className="flex-row">
+          <label className="text-xs text-muted" htmlFor="patient-rx-select">Prescription:</label>
           <select
+            id="patient-rx-select"
             className="select-input font-mono"
-            value={selectedRxId}
+            style={{ width: 'auto' }}
+            value={selectedRx.prescriptionId}
             onChange={(e) => setSelectedRxId(e.target.value)}
           >
             {prescriptions.map((r) => (
               <option key={r.prescriptionId} value={r.prescriptionId}>
-                {r.prescriptionId} — {r.patientName} [{r.state}]
+                {r.prescriptionId} — {r.patientName} ({r.state})
               </option>
             ))}
           </select>
         </div>
       </div>
 
-      <div className="patient-pass-card">
-        {/* Pass Top Banner */}
-        <div className="pass-top-band">
-          <div className="pass-brand">
-            <ShieldCheck size={20} className="text-emerald" />
-            <span className="pass-brand-title">MedTrust E-Prescription Pass</span>
-          </div>
-          <div
-            className={`status-tag ${
-              selectedRx.state === 'Active'
-                ? 'tag-active'
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">
+            <span>{selectedRx.patientName}</span>
+            <span
+              className={`badge ${
+                selectedRx.state === 'Active'
+                  ? 'badge-active'
+                  : selectedRx.state === 'Fulfilled'
+                  ? 'badge-fulfilled'
+                  : 'badge-expired'
+              }`}
+            >
+              {selectedRx.state === 'Active'
+                ? 'Active • Ready to Use'
                 : selectedRx.state === 'Fulfilled'
-                ? 'tag-fulfilled'
-                : 'tag-expired'
-            }`}
-          >
-            {selectedRx.state === 'Active' && '● Active & Valid for Dispensing'}
-            {selectedRx.state === 'Fulfilled' && '✓ Fulfilled by Pharmacy'}
-            {selectedRx.state === 'Expired' && '✕ Expired'}
+                ? 'Fulfilled • Already Used'
+                : 'Expired'}
+            </span>
           </div>
+
+          {onNavigate && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => onNavigate('pos')}
+            >
+              <span>Verify at Pharmacist POS</span>
+              <ArrowRight size={14} />
+            </button>
+          )}
         </div>
 
-        {/* Pass Body */}
-        <div className="pass-body-grid">
-          {/* QR Code Presentation Box */}
-          <div className="pass-qr-section">
-            <div className="qr-wrapper">
-              <QRCodeSVG
-                value={selectedRx.prescriptionId}
-                size={180}
-                level="H"
-                includeMargin={true}
-              />
+        <div className="pass-layout">
+          <div className="qr-box">
+            <QRCodeSVG
+              value={selectedRx.prescriptionId}
+              size={168}
+              level="H"
+              includeMargin={true}
+            />
+            <div className="font-mono font-bold text-sm" style={{ color: '#0F172A' }}>
+              {selectedRx.prescriptionId}
             </div>
-            <div className="pass-qr-id font-mono text-cyan font-bold">{selectedRx.prescriptionId}</div>
-            <p className="pass-qr-hint">Scan at Pharmacist POS Terminal</p>
+            <span className="text-xs text-muted">Scan at Pharmacist POS</span>
           </div>
 
-          {/* Clinical & Pharmacological Details */}
-          <div className="pass-details-section">
-            <div className="patient-meta-header">
-              <div>
-                <span className="text-xs text-muted uppercase">Patient Name (Off-Chain)</span>
-                <div className="text-lg font-bold">{selectedRx.patientName}</div>
+          <div className="form-stack">
+            <div className="meta-list">
+              <div className="meta-item">
+                <span className="meta-label">Prescribed Medication</span>
+                <span className="meta-value">
+                  {selectedRx.drugName} ({selectedRx.dosage})
+                </span>
               </div>
-              <div>
-                <span className="text-xs text-muted uppercase">Prescribing Physician</span>
-                <div className="font-semibold text-emerald">{selectedRx.doctorName}</div>
-                <div className="text-xs text-muted font-mono">{selectedRx.doctorLicense}</div>
+
+              <div className="meta-item">
+                <span className="meta-label">Prescribing Doctor</span>
+                <span className="meta-value">{selectedRx.doctorName}</span>
+                <span className="text-xs text-muted font-mono">{selectedRx.doctorLicense}</span>
+              </div>
+
+              <div className="meta-item">
+                <span className="meta-label">Issued Date</span>
+                <span className="text-sm">{new Date(selectedRx.issueTimestamp).toLocaleDateString()}</span>
+              </div>
+
+              <div className="meta-item">
+                <span className="meta-label">Valid Until</span>
+                <span className="text-sm">{new Date(selectedRx.expiryTimestamp).toLocaleDateString()}</span>
               </div>
             </div>
 
-            <div className="pass-drug-card">
-              <div className="drug-headline-row">
-                <div>
-                  <div className="drug-name-text">{selectedRx.drugName}</div>
-                  <div className="drug-dosage-text">{selectedRx.dosage}</div>
-                </div>
-                <div className="rx-badge">Rx Only</div>
-              </div>
-              {selectedRx.instructions && (
-                <div className="drug-instructions-row">
-                  <span className="text-xs text-muted">Instructions: </span>
-                  <span className="text-sm font-medium">{selectedRx.instructions}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="pass-timeline-row">
+            {selectedRx.instructions && (
               <div>
-                <span className="text-xs text-muted">Issued:</span>
-                <div className="text-sm">
-                  {new Date(selectedRx.issueTimestamp).toLocaleDateString()}
-                </div>
+                <span className="meta-label">Dosage Instructions</span>
+                <p className="text-sm" style={{ marginTop: '2px' }}>{selectedRx.instructions}</p>
               </div>
-              <div>
-                <span className="text-xs text-muted">Expires:</span>
-                <div className="text-sm">
-                  {new Date(selectedRx.expiryTimestamp).toLocaleDateString()}
-                </div>
-              </div>
-              {selectedRx.dispensedPharmacyId && (
-                <div>
-                  <span className="text-xs text-muted">Dispensed By:</span>
-                  <div className="text-sm font-mono text-emerald">{selectedRx.dispensedPharmacyId}</div>
-                </div>
-              )}
-            </div>
+            )}
 
-            {/* Cryptographic Proof & DPDP Act Callout */}
-            <div className="proof-box">
-              <div className="proof-header">
-                <span className="text-xs font-mono text-muted">256-bit SHA-256 On-Chain Commitment:</span>
-                <button className="copy-btn" onClick={handleCopyHash} title="Copy Hash">
-                  {copied ? <Check size={12} className="text-emerald" /> : <Copy size={12} />}
-                  <span>{copied ? 'Copied' : 'Copy'}</span>
+            <div className="flex-row">
+              <span className="text-xs text-muted">On-Chain Hash:</span>
+              <span className="short-hash-pill">
+                <span>{selectedRx.saltedHash?.slice(0, 8)}...</span>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  style={{ padding: '2px 4px' }}
+                  onClick={handleCopyHash}
+                >
+                  {copied ? <Check size={12} /> : <Copy size={12} />}
+                  <span style={{ marginLeft: '4px' }}>{copied ? 'Copied' : 'Copy'}</span>
                 </button>
-              </div>
-              <div className="proof-hash font-mono text-xs text-cyan">{selectedRx.saltedHash}</div>
-            </div>
-
-            <div className="dpdp-badge">
-              <ShieldCheck size={14} className="text-emerald" />
-              <span>
-                <strong>Privacy Guaranteed:</strong> Complies with India's Digital Personal Data Protection Act (2023). Plaintext identity remains local to your device and clinic; zero health data is public on-chain.
               </span>
             </div>
+
+            <details className="tech-details">
+              <summary>Technical details (Full SHA-256 hash & privacy note)</summary>
+              <div className="tech-details-body">
+                <div>
+                  <strong>Full Salted SHA-256 Hash:</strong>
+                  <div className="font-mono" style={{ wordBreak: 'break-all', marginTop: '2px' }}>
+                    {selectedRx.saltedHash}
+                  </div>
+                </div>
+                <div>
+                  <strong>Privacy Protection (DPDP Act 2023):</strong> Patient name and diagnosis are stored off-chain only. The blockchain stores only this salted SHA-256 hash and the doctor’s ECDSA signature.
+                </div>
+              </div>
+            </details>
           </div>
         </div>
       </div>

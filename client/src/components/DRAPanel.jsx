@@ -1,14 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Landmark, ShieldAlert, AlertTriangle, Radio } from 'lucide-react';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { getDRAIncidents, getDRAStats, issueDRARecall } from '../services/api';
 
-export default function DRAPanel({ onRecallIssued }) {
+const FRIENDLY_BREACH_TITLES = {
+  REPLAY_FRAUD_DETECTED: 'Prescription Already Used (Replay Attempt)',
+  EXPIRED_PRESCRIPTION: 'Expired Prescription Presented',
+  PRESCRIPTION_NOT_FOUND: 'Unregistered Prescription ID',
+  COUNTERFEIT_BATCH_DETECTED: 'Unregistered / Counterfeit Drug Batch',
+  BROKEN_CUSTODY_CHAIN: 'Batch Not in Pharmacy Custody',
+  RECALLED_DRUG_BATCH: 'Attempted Dispense of Recalled Batch',
+  DRUG_MISMATCH_DETECTED: 'Medication Mismatch Between Rx & Batch',
+  DRA_RECALL_MANDATE: 'Regulatory Recall Issued by CDSCO',
+};
+
+export default function DRAPanel({ batches = [], onRecallIssued, onNavigate }) {
   const [stats, setStats] = useState(null);
   const [incidents, setIncidents] = useState([]);
   const [recallBatchId, setRecallBatchId] = useState('BATCH-CIPLA-AZI-2026-01');
-  const [recallReason, setRecallReason] = useState('Substandard Active Pharmaceutical Ingredient purity test failure (CDSCO Alert)');
+  const [recallReason, setRecallReason] = useState(
+    'Substandard Active Pharmaceutical Ingredient purity test failure (CDSCO Alert)'
+  );
   const [loading, setLoading] = useState(false);
-  const [actionMsg, setActionMsg] = useState('');
+  const [actionResult, setActionResult] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const loadDRAData = async () => {
     try {
@@ -25,17 +39,21 @@ export default function DRAPanel({ onRecallIssued }) {
 
   useEffect(() => {
     const timer = setTimeout(loadDRAData, 0);
-    const interval = setInterval(loadDRAData, 3000);
+    const interval = setInterval(loadDRAData, 4000);
     return () => {
       clearTimeout(timer);
       clearInterval(interval);
     };
   }, []);
 
+  const isFormValid = recallBatchId.trim().length > 0 && recallReason.trim().length > 0;
+
   const handleBroadcastRecall = async (e) => {
     e.preventDefault();
+    if (!isFormValid) return;
     setLoading(true);
-    setActionMsg('');
+    setActionResult(null);
+    setErrorMsg('');
 
     try {
       const res = await issueDRARecall({
@@ -43,82 +61,90 @@ export default function DRAPanel({ onRecallIssued }) {
         reason: recallReason.trim(),
         authority: 'CDSCO Central Drug Controller',
       });
-      setActionMsg(`✅ Recall broadcast committed to block #${res.blockHeight}. Any dispensing of ${recallBatchId} will be blocked across the consortium.`);
+      setActionResult(res);
       loadDRAData();
       if (onRecallIssued) onRecallIssued();
     } catch (err) {
-      setActionMsg(`❌ Failed to issue recall: ${err.message}`);
+      setErrorMsg(err.message || 'Failed to issue recall.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="portal-container">
-      {/* DRA Banner */}
-      <div className="portal-banner">
-        <div className="banner-profile">
-          <div className="avatar-box avatar-dra">
-            <Landmark size={24} />
-          </div>
-          <div>
-            <div className="banner-title-row">
-              <h2 className="banner-title">Drug Regulatory Authority (DRA) Command Panel</h2>
-              <span className="badge-dra">Apex Regulatory Oversight</span>
-            </div>
-            <p className="banner-sub">
-              Central Drugs Standard Control Organisation (CDSCO) • Root Certificate Authority Node
-            </p>
-          </div>
-        </div>
-        <div className="crypto-assurance-pill">
-          <Radio size={14} className="text-rose animate-pulse" />
-          <span>Real-Time Recall & Fraud Interception Network</span>
+    <div className="page-stack">
+      <div className="page-header">
+        <div>
+          <h2 className="page-title">Regulator Oversight (CDSCO / DRA)</h2>
+          <p className="page-subtitle">
+            Monitor blocked dispensing attempts and broadcast instant drug batch recalls
+          </p>
         </div>
       </div>
 
-      {/* Network Stats Cards */}
+      {/* 4 Summary Metrics */}
       {stats && (
-        <div className="stats-grid-4">
+        <div className="grid-4">
           <div className="stat-card">
             <span className="stat-label">Total Prescriptions</span>
-            <div className="stat-value text-emerald">{stats.totalPrescriptions}</div>
-            <span className="stat-sub">Active: {stats.activePrescriptions} | Fulfilled: {stats.fulfilledPrescriptions}</span>
+            <div className="stat-value">{stats.totalPrescriptions}</div>
+            <span className="stat-sub">
+              {stats.activePrescriptions} active • {stats.fulfilledPrescriptions} fulfilled
+            </span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Total Batches Tracked</span>
-            <div className="stat-value text-cyan">{stats.totalBatches}</div>
-            <span className="stat-sub">Dispensed: {stats.dispensedBatches} | Recalled: {stats.recalledBatches}</span>
+            <span className="stat-label">Drug Batches</span>
+            <div className="stat-value">{stats.totalBatches}</div>
+            <span className="stat-sub">
+              {stats.dispensedBatches} dispensed • {stats.recalledBatches} recalled
+            </span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Blocked Fraud Incidents</span>
-            <div className="stat-value text-rose">{stats.blockedIncidents}</div>
-            <span className="stat-sub">Interception Rate: 100%</span>
+            <span className="stat-label">Blocked Attempts</span>
+            <div className="stat-value text-danger">{stats.blockedIncidents}</div>
+            <span className="stat-sub">Logged at point of sale</span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Fabric Block Height</span>
-            <div className="stat-value text-purple font-mono">#{stats.blockHeight}</div>
-            <span className="stat-sub">Immutable Ledgers Synced</span>
+            <span className="stat-label">Ledger Height</span>
+            <div className="stat-value font-mono">#{stats.blockHeight}</div>
+            <span className="stat-sub">Total blocks committed</span>
           </div>
         </div>
       )}
 
-      <div className="two-column-grid mt-6">
-        {/* Broadcast Recall Action Card */}
-        <div className="panel-card">
-          <div className="panel-header">
-            <ShieldAlert size={18} className="text-rose" />
-            <h3 className="panel-title">Broadcast Instant Drug Batch Recall</h3>
+      <div className="grid-2">
+        {/* Left: Issue Recall Form */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Recall a Drug Batch</h3>
           </div>
 
-          <form onSubmit={handleBroadcastRecall} className="form-layout">
-            <p className="text-sm text-muted">
-              Broadcasting a recall commits an immediate cryptographic recall flag across all consortium peers. Pharmacist terminals will atomically reject any attempted dispense of this batch with zero delay.
-            </p>
+          <form onSubmit={handleBroadcastRecall} className="form-stack">
+            {batches.length > 0 && (
+              <div className="form-group">
+                <label className="field-label" htmlFor="dra-batch-select">Select Registered Batch</label>
+                <select
+                  id="dra-batch-select"
+                  className="select-input font-mono"
+                  value={batches.some((b) => b.batchId === recallBatchId) ? recallBatchId : ''}
+                  onChange={(e) => {
+                    if (e.target.value) setRecallBatchId(e.target.value);
+                  }}
+                >
+                  <option value="">-- Custom Batch ID --</option>
+                  {batches.map((b) => (
+                    <option key={b.batchId} value={b.batchId}>
+                      {b.batchId} — {b.drugName} {b.isRecalled ? '[Already Recalled]' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="form-group">
-              <label className="input-field-label">Target Batch Serial ID to Blacklist</label>
+              <label className="field-label" htmlFor="dra-batch-input">Batch Serial ID</label>
               <input
+                id="dra-batch-input"
                 type="text"
                 className="text-input font-mono"
                 value={recallBatchId}
@@ -129,8 +155,9 @@ export default function DRAPanel({ onRecallIssued }) {
             </div>
 
             <div className="form-group">
-              <label className="input-field-label">Regulatory Justification / Recall Notice</label>
+              <label className="field-label" htmlFor="dra-reason">Recall Reason</label>
               <textarea
+                id="dra-reason"
                 className="text-input"
                 rows="3"
                 value={recallReason}
@@ -139,49 +166,73 @@ export default function DRAPanel({ onRecallIssued }) {
               />
             </div>
 
-            <button type="submit" className="btn-danger" disabled={loading}>
-              {loading ? 'Broadcasting to Fabric Network...' : 'Commit Regulatory Recall to Blockchain'}
+            <button
+              type="submit"
+              className="btn btn-danger btn-lg"
+              disabled={loading || !isFormValid}
+            >
+              {loading ? 'Broadcasting Recall...' : 'Issue Immediate Recall'}
             </button>
           </form>
 
-          {actionMsg && <div className="notification-banner mt-4">{actionMsg}</div>}
+          {errorMsg && (
+            <div className="feedback-box feedback-error">
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {actionResult && (
+            <div className="feedback-box feedback-success">
+              <div className="flex-row">
+                <CheckCircle2 size={18} />
+                <span>
+                  Batch <strong>{actionResult.batch?.batchId}</strong> recalled (Block #{actionResult.blockHeight})
+                </span>
+              </div>
+              {onNavigate && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => onNavigate('pos')}
+                >
+                  <span>Test at Pharmacist POS</span>
+                  <ArrowRight size={14} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Real-time Incident & Breach Feed */}
-        <div className="panel-card">
-          <div className="panel-header">
-            <AlertTriangle size={18} className="text-amber" />
-            <h3 className="panel-title">Security Incident & Breach Feed ({incidents.length})</h3>
+        {/* Right: Blocked Attempts & Incident Feed */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Recent Security Alerts ({incidents.length})</h3>
           </div>
 
-          <div className="incident-feed-scroll">
+          <div className="incident-list">
             {incidents.length === 0 ? (
-              <div className="empty-placeholder">No security breaches detected yet. Clean operation.</div>
+              <div className="empty-state">
+                No blocked attempts or recalls recorded yet.
+              </div>
             ) : (
               incidents.map((inc) => (
-                <div key={inc.id} className="incident-feed-item">
-                  <div className="incident-header-row">
-                    <span className="incident-id font-mono text-xs">{inc.id}</span>
-                    <span className={`severity-tag ${inc.severity === 'CRITICAL' ? 'sev-crit' : 'sev-high'}`}>
-                      {inc.severity}
-                    </span>
-                    <span className="incident-time text-xs text-muted">
+                <div key={inc.id} className="incident-card">
+                  <div className="flex-between">
+                    <strong className="text-sm text-danger">
+                      {FRIENDLY_BREACH_TITLES[inc.breachCode] || inc.breachCode}
+                    </strong>
+                    <span className="text-xs text-muted">
                       {new Date(inc.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
-                  <div className="incident-breach-title font-bold text-rose text-sm">
-                    {inc.breachCode}
-                  </div>
-                  <div className="incident-reason-text text-xs text-muted mt-1">{inc.reason}</div>
-                  <div className="incident-meta-tags">
+                  <div className="text-xs text-muted">{inc.reason}</div>
+                  <div className="flex-row" style={{ marginTop: '4px' }}>
+                    <span className="badge badge-neutral font-mono">{inc.breachCode}</span>
                     {inc.prescriptionId && (
-                      <span className="meta-tag font-mono">Rx: {inc.prescriptionId}</span>
+                      <span className="text-xs font-mono text-light">Rx: {inc.prescriptionId}</span>
                     )}
                     {inc.batchId && (
-                      <span className="meta-tag font-mono">Batch: {inc.batchId}</span>
-                    )}
-                    {inc.pharmacyId && (
-                      <span className="meta-tag font-mono">Node: {inc.pharmacyId}</span>
+                      <span className="text-xs font-mono text-light">Batch: {inc.batchId}</span>
                     )}
                   </div>
                 </div>

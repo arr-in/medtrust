@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Truck, ArrowRight, MapPin, CheckCircle2, History } from 'lucide-react';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { transferCustody } from '../services/api';
 
-export default function DistributorPortal({ batches = [], onCustodyTransferred }) {
+export default function DistributorPortal({ batches = [], onCustodyTransferred, onNavigate }) {
   const [selectedBatchId, setSelectedBatchId] = useState(
     batches[0]?.batchId || 'BATCH-SUN-PCM-2026-99'
   );
@@ -15,9 +15,16 @@ export default function DistributorPortal({ batches = [], onCustodyTransferred }
 
   const selectedBatch = batches.find((b) => b.batchId === selectedBatchId) || batches[0];
 
+  const canTransfer =
+    Boolean(selectedBatch) &&
+    !selectedBatch.isDispensed &&
+    !selectedBatch.isRecalled &&
+    selectedBatch.currentCustodianId !== recipientId &&
+    location.trim().length > 0;
+
   const handleTransfer = async (e) => {
     e.preventDefault();
-    if (!selectedBatch) return;
+    if (!selectedBatch || !canTransfer) return;
 
     setLoading(true);
     setErrorMsg('');
@@ -34,49 +41,37 @@ export default function DistributorPortal({ batches = [], onCustodyTransferred }
       setResult(res);
       if (onCustodyTransferred) onCustodyTransferred();
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to transfer custody');
+      setErrorMsg(err.message || 'Could not transfer custody.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="portal-container">
-      <div className="portal-banner">
-        <div className="banner-profile">
-          <div className="avatar-box avatar-dist">
-            <Truck size={24} />
-          </div>
-          <div>
-            <div className="banner-title-row">
-              <h2 className="banner-title">Logistics & Wholesaler Custody Terminal</h2>
-              <span className="badge-dist">Certified Logistics Hub</span>
-            </div>
-            <p className="banner-sub">
-              Blue Dart LifeSciences Cold Chain • Indore Central Depot (Lic: <span className="font-mono text-cyan">MP-LOG-2022-019</span>)
-            </p>
-          </div>
-        </div>
-        <div className="crypto-assurance-pill">
-          <MapPin size={14} className="text-cyan" />
-          <span>Cryptographic Custody Transition Logging</span>
+    <div className="page-stack">
+      <div className="page-header">
+        <div>
+          <h2 className="page-title">Distributor & Logistics</h2>
+          <p className="page-subtitle">
+            Record custody handoffs from manufacturer to wholesaler or pharmacy
+          </p>
         </div>
       </div>
 
-      <div className="two-column-grid">
-        {/* Handoff Form */}
-        <div className="panel-card">
-          <div className="panel-header">
-            <ArrowRight size={18} className="text-cyan" />
-            <h3 className="panel-title">Sign Next Supply Chain Custody Handoff</h3>
+      <div className="grid-2">
+        {/* Left: Custody Handoff Form */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Transfer Batch Custody</h3>
           </div>
 
-          <form onSubmit={handleTransfer} className="form-layout">
+          <form onSubmit={handleTransfer} className="form-stack">
             <div className="form-group">
-              <label className="input-field-label">Select Drug Batch to Route</label>
+              <label className="field-label" htmlFor="dist-batch-select">Drug Batch</label>
               <select
+                id="dist-batch-select"
                 className="select-input font-mono"
-                value={selectedBatchId}
+                value={selectedBatch?.batchId || ''}
                 onChange={(e) => {
                   setSelectedBatchId(e.target.value);
                   setResult(null);
@@ -85,71 +80,56 @@ export default function DistributorPortal({ batches = [], onCustodyTransferred }
               >
                 {batches.map((b) => (
                   <option key={b.batchId} value={b.batchId}>
-                    {b.batchId} — {b.drugName} (At: {b.currentCustodianId})
+                    {b.batchId} — {b.drugName} (Holder: {b.currentCustodianId})
                   </option>
                 ))}
               </select>
             </div>
 
             {selectedBatch && (
-              <div className="current-custody-summary">
-                <div className="summary-row">
-                  <span className="text-muted">Current Custodian:</span>
-                  <span className="font-mono text-purple font-semibold">
-                    {selectedBatch.currentCustodianId} ({selectedBatch.currentCustodianRole})
-                  </span>
+              <div className="flex-between" style={{ padding: '10px 12px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)' }}>
+                <div className="text-xs">
+                  <span className="text-muted">Current Holder: </span>
+                  <strong className="font-mono">{selectedBatch.currentCustodianId}</strong> ({selectedBatch.currentCustodianRole})
                 </div>
-                <div className="summary-row">
-                  <span className="text-muted">Batch Status:</span>
-                  <span>
-                    {selectedBatch.isDispensed ? (
-                      <span className="status-tag tag-dispensed">Already Dispensed</span>
-                    ) : selectedBatch.isRecalled ? (
-                      <span className="status-tag tag-recalled">Recalled</span>
-                    ) : (
-                      <span className="status-tag tag-active">Eligible for Transfer</span>
-                    )}
-                  </span>
-                </div>
+                {selectedBatch.isDispensed ? (
+                  <span className="badge badge-dispensed">Already Dispensed</span>
+                ) : selectedBatch.isRecalled ? (
+                  <span className="badge badge-recalled">Recalled</span>
+                ) : (
+                  <span className="badge badge-active">Ready to Transfer</span>
+                )}
               </div>
             )}
 
-            <div className="form-row-2">
-              <div className="form-group">
-                <label className="input-field-label">Transfer Recipient Node</label>
-                <select
-                  className="select-input font-mono"
-                  value={recipientId}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setRecipientId(val);
-                    if (val.startsWith('PHARM')) {
-                      setRecipientRole('Pharmacy');
-                    } else if (val.startsWith('DIST')) {
-                      setRecipientRole('Distributor');
-                    }
-                  }}
-                >
-                  <option value="PHARM-APOLLO-104">PHARM-APOLLO-104 (Apollo Pharmacy Indore)</option>
-                  <option value="PHARM-MEDPLUS-77">PHARM-MEDPLUS-77 (MedPlus Chemist Indore)</option>
-                  <option value="DIST-ALLKEM-BHO">DIST-ALLKEM-BHO (Allkem Wholesalers Bhopal)</option>
-                  <option value="DIST-BLUEDART-IND">DIST-BLUEDART-IND (Blue Dart Indore Depot)</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="input-field-label">Recipient Node Role</label>
-                <input
-                  type="text"
-                  className="text-input"
-                  value={recipientRole}
-                  readOnly
-                />
-              </div>
+            <div className="form-group">
+              <label className="field-label" htmlFor="dist-recipient">Transfer To (Recipient)</label>
+              <select
+                id="dist-recipient"
+                className="select-input font-mono"
+                value={recipientId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setRecipientId(val);
+                  setRecipientRole(val.startsWith('PHARM') ? 'Pharmacy' : 'Distributor');
+                }}
+              >
+                <option value="PHARM-APOLLO-104">PHARM-APOLLO-104 (Apollo Pharmacy Indore)</option>
+                <option value="PHARM-MEDPLUS-77">PHARM-MEDPLUS-77 (MedPlus Chemist Indore)</option>
+                <option value="DIST-ALLKEM-BHO">DIST-ALLKEM-BHO (Allkem Wholesalers Bhopal)</option>
+                <option value="DIST-BLUEDART-IND">DIST-BLUEDART-IND (Blue Dart Indore Depot)</option>
+              </select>
+              {selectedBatch?.currentCustodianId === recipientId && (
+                <span className="field-hint text-danger">
+                  This batch is already held by {recipientId}. Choose a different recipient.
+                </span>
+              )}
             </div>
 
             <div className="form-group">
-              <label className="input-field-label">Geographic Checkpoint / Waypoint Location</label>
+              <label className="field-label" htmlFor="dist-location">Checkpoint Location</label>
               <input
+                id="dist-location"
                 type="text"
                 className="text-input"
                 value={location}
@@ -160,63 +140,83 @@ export default function DistributorPortal({ batches = [], onCustodyTransferred }
 
             <button
               type="submit"
-              className="btn-primary"
-              disabled={loading || selectedBatch?.isDispensed || selectedBatch?.isRecalled}
+              className="btn btn-primary btn-lg"
+              disabled={loading || !canTransfer}
             >
-              {loading ? 'Committing Custody Block...' : 'Digitally Sign & Commit Custody Transfer'}
+              {loading ? 'Saving Transfer...' : 'Confirm Custody Transfer'}
             </button>
           </form>
 
-          {errorMsg && <div className="error-banner">{errorMsg}</div>}
+          {errorMsg && (
+            <div className="feedback-box feedback-error">
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
           {result && (
-            <div className="success-banner mt-4">
-              <CheckCircle2 size={18} className="text-emerald" />
-              <div>
-                <strong>Custody Transferred:</strong> New custodian is {result.batch?.currentCustodianId} (Block #{result.blockHeight})
+            <div className="feedback-box feedback-success">
+              <div className="flex-row">
+                <CheckCircle2 size={18} />
+                <span>
+                  Transferred to <strong>{result.batch?.currentCustodianId}</strong> (Block #{result.blockHeight})
+                </span>
               </div>
+              {onNavigate && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => onNavigate('pos')}
+                >
+                  <span>Verify at Pharmacist POS</span>
+                  <ArrowRight size={14} />
+                </button>
+              )}
             </div>
           )}
         </div>
 
-        {/* Custody Timeline Visualization */}
-        <div className="panel-card">
-          <div className="panel-header">
-            <History size={18} className="text-emerald" />
-            <h3 className="panel-title">
-              Custody Journey Timeline: <span className="font-mono text-cyan">{selectedBatch?.batchId}</span>
+        {/* Right: Clean Custody Chain Timeline */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">
+              Custody History: <span className="font-mono text-sm">{selectedBatch?.batchId}</span>
             </h3>
           </div>
 
-          {selectedBatch?.custodyHistory && (
-            <div className="timeline-container">
+          {selectedBatch?.custodyHistory?.length ? (
+            <div className="step-timeline">
               {selectedBatch.custodyHistory.map((hop, idx) => (
-                <div key={idx} className="timeline-item">
-                  <div className="timeline-marker">
-                    <span className="marker-number">{idx + 1}</span>
-                  </div>
-                  <div className="timeline-content">
-                    <div className="timeline-title-row">
-                      <span className="font-mono text-sm font-bold text-cyan">{hop.transitionId}</span>
-                      <span className="timeline-time text-muted text-xs">
-                        {new Date(hop.timestamp).toLocaleString()}
+                <div key={idx} className="timeline-card">
+                  <span className="step-badge">{idx + 1}</span>
+                  <div style={{ flex: 1 }}>
+                    <div className="flex-between">
+                      <div className="font-mono font-semibold text-sm">
+                        {hop.senderId} → {hop.recipientId}
+                      </div>
+                      <span className="text-xs text-muted">
+                        {new Date(hop.timestamp).toLocaleDateString()}
                       </span>
                     </div>
-                    <div className="timeline-route">
-                      <span className="route-node font-mono">{hop.senderId}</span>
-                      <ArrowRight size={14} className="text-muted" />
-                      <span className="route-node font-mono text-emerald">{hop.recipientId}</span>
-                    </div>
-                    <div className="timeline-location text-xs text-muted">
-                      <MapPin size={11} className="inline-icon" /> {hop.location}
-                    </div>
-                    <div className="timeline-sig font-mono text-xs text-muted">
-                      Sig: {hop.signatureHex.slice(0, 32)}...
+                    <div className="text-xs text-muted" style={{ marginTop: '2px' }}>
+                      {hop.location}
                     </div>
                   </div>
                 </div>
               ))}
+
+              <details className="tech-details">
+                <summary>Technical details (Hop transition IDs & signatures)</summary>
+                <div className="tech-details-body">
+                  {selectedBatch.custodyHistory.map((hop, idx) => (
+                    <div key={idx} className="font-mono text-xs">
+                      {hop.transitionId}: {hop.signatureHex.slice(0, 24)}...
+                    </div>
+                  ))}
+                </div>
+              </details>
             </div>
+          ) : (
+            <div className="empty-state">Select a batch to view its custody chain.</div>
           )}
         </div>
       </div>

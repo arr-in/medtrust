@@ -7,7 +7,7 @@
 
 ## 0. Opening & Problem Statement (0:00 – 1:00)
 
-**Screen:** Start on the **Verification Gate (`⚡ Verification Gate`)** tab (`http://localhost:3000`). Point to the header showing `medtrust-channel` (green pulsing dot) and `ECDSA P-256`.
+**Screen:** Start on the **`Pharmacist POS`** tab (`http://localhost:3000`). Point to the header showing the **`Network Online`** status pill, role navigation tabs, and theme toggle.
 
 **What to say:**
 > "Good morning/afternoon. Our project, **MedTrust**, solves what we call the **Dual-Layer Verification Gap** in pharmaceutical dispensing.  
@@ -19,53 +19,50 @@
 ## 1. Supply Chain Genesis — Manufacturer Portal (1:00 – 2:15)
 
 **Action:**
-1. Click the **`🏭 Manufacturer`** tab in the top navigation bar.
+1. Click the **`Manufacturer`** tab in the top navigation bar.
 2. Point to the pre-filled form for **Cipla Ltd., Verna Industrial Estate, Goa (`MFG-CIPLA-GOA`)**:
    - **Drug Name:** `Azithromycin IP`
    - **Strength / Dosage:** `500mg`
-   - **NDC Barcode:** `0378-0012-05`
-   - **Shelf Life:** `18` months
-3. Set **Batch Serial ID** to `BATCH-CIPLA-DEMO-01` (or keep the pre-generated `BATCH-CIPLA-XXXX`).
-4. Click **"Commit Batch Genesis to Blockchain"**.
-5. Scroll down to the **Active Batches Registered on Consortium Ledger** table and point out `BATCH-CIPLA-DEMO-01` with Custodian `MFG-CIPLA-GOA (Manufacturer)` and Status `In Supply Chain`.
+   - **Batch Serial ID:** Set to `BATCH-CIPLA-DEMO-01` (or keep the pre-generated `BATCH-CIPLA-XXXX`).
+   - *(Optional)* Expand **"Facility & Barcode Details (Optional)"** if asked about NDC barcode (`0378-0012-05`) or shelf life (`18` months).
+3. Click **"Register Drug Batch"**.
+4. Point to the green confirmation banner showing `Batch BATCH-CIPLA-DEMO-01 registered on ledger`, and check the **Registered Drug Batches** table on the right (`Custodian: MFG-CIPLA-GOA`, Status: `In Supply Chain`).
+5. Click the guided next-step button **`"Next: Transfer Custody →"`** inside the success banner to jump directly to the **Distributor** tab.
 
 **What to say:**
-> "We start at the physical drug's origin. Here, Cipla's Goa facility registers a new batch of Azithromycin 500mg (`BATCH-CIPLA-DEMO-01`). Clicking commit writes a `BATCH_GENESIS_REGISTRATION` block to the ledger and assigns initial custody to `MFG-CIPLA-GOA`. Notice the table below also holds our pre-seeded consortium batches, including `BATCH-CIPLA-AZI-2026-01` (already at Apollo Pharmacy), `BATCH-SUN-PCM-2026-99` (currently in transit with a distributor), and `BATCH-CIPLA-AMX-RECALLED`."
+> "We start at the physical drug's origin. Here, Cipla's Goa facility registers a new batch of Azithromycin 500mg (`BATCH-CIPLA-DEMO-01`). Clicking **Register Drug Batch** writes a genesis block to the ledger and assigns initial custody to `MFG-CIPLA-GOA`. Notice the table on the right also holds our pre-seeded consortium batches, including `BATCH-CIPLA-AZI-2026-01` (already at Apollo Pharmacy), `BATCH-SUN-PCM-2026-99` (in transit with a distributor), and `BATCH-CIPLA-AMX-RECALLED`."
 
 ---
 
 ## 2. Multi-Hop Logistics — Distributor Portal (2:15 – 3:15)
 
 **Action:**
-1. Click the **`🚚 Distributor`** tab.
-2. In **"Select Drug Batch to Route"**, select `BATCH-CIPLA-DEMO-01 — Azithromycin IP (At: MFG-CIPLA-GOA)`.
-3. In **"Transfer Recipient Node"**, keep `PHARM-APOLLO-104 (Apollo Pharmacy Indore)` selected.
-4. Click **"Digitally Sign & Commit Custody Transfer"**.
-5. Point to the **Custody Journey Timeline** on the right showing:
-   - `HOP-1-GENESIS`: `PLANT-GENESIS → MFG-CIPLA-GOA`
-   - `HOP-2-TRANSFER`: `MFG-CIPLA-GOA → PHARM-APOLLO-104`
+1. On the **`Distributor`** tab, in **"1. Select Drug Batch"**, select `BATCH-CIPLA-DEMO-01 — Azithromycin IP (At: MFG-CIPLA-GOA)`.
+2. In **"2. Destination Node"**, keep `Apollo Pharmacy Indore (PHARM-APOLLO-104)` selected.
+3. Click **"Confirm Custody Transfer"**.
+4. Point to the **Custody History** timeline on the right showing:
+   - `1`: `PLANT-GENESIS → MFG-CIPLA-GOA` (`HOP-1-GENESIS`)
+   - `2`: `MFG-CIPLA-GOA → PHARM-APOLLO-104` (`HOP-2-TRANSFER`)
+   - *(Optional)* Click **"Technical details (signature & location)"** on a hop card to show the cryptographic signature.
 
 **What to say:**
-> "Next, the physical batch moves through the distribution corridor. When we sign the custody handoff to Apollo Pharmacy Indore (`PHARM-APOLLO-104`), the ledger verifies that the sender actually possesses the batch before appending `HOP-2-TRANSFER`. If a grey-market diversion occurs and a batch shows up at a pharmacy that isn't the current on-chain custodian, the POS terminal will block it."
+> "Next, the physical batch moves through the distribution corridor. When we confirm the custody handoff to Apollo Pharmacy Indore (`PHARM-APOLLO-104`), the ledger verifies that the sender actually possesses the batch before appending `HOP-2-TRANSFER`. If a grey-market diversion occurs and a batch shows up at a pharmacy that isn't the current on-chain custodian, the POS terminal will block it."
 
 ---
 
-## 3. Privacy-Preserving E-Prescription — Doctor Portal & Patient Pass (3:15 – 4:45)
+## 3. Privacy-Preserving E-Prescription — Doctor & Patient Pass (3:15 – 4:45)
 
 **Action:**
-1. Click the **`🩺 Doctor`** tab.
-2. Show the pre-filled form for **Dr. Ananya Sharma (`DOC-99412`, License `MCI-2018-99412`)**:
+1. Click the **`Doctor`** tab.
+2. Show the clean 4-field form for **Dr. Ananya Sharma (`DOC-99412`, License `MCI-2018-99412`)**:
    - **Patient ID:** `PAT-IND-2026-7731`
-   - **Patient Full Name (Off-Chain Only):** `Kavita Deshmukh`
-   - **Drug / Generic Name:** `Azithromycin IP`
-   - **Strength & Dosage:** `500mg`
-3. Click **"Sign with ECDSA Key & Write to Ledger"**.
-4. Point to the right panel showing:
-   - **Patient QR Pass** (`RX-2026-XXXX`)
-   - **256-bit Salted Hash (Module 1)**
-   - **Random 128-bit Cryptographic Salt**
-5. Scroll down to the **Prescriptions Recorded on Fabric Ledger** table and show that **Patient Name** (`Rohan Verma`, `Pooja Mehta`, `Sanjay Singhal`, `Kavita Deshmukh`), **Drug Name**, and **Dosage** are joined from the off-chain clinical store while only the salted SHA-256 hash lives on-chain.
-6. Click the **`📱 Patient`** tab (`Patient Pass`) and select `RX-2026-001-ACTIVE — Rohan Verma [Active]` from the top-right dropdown. Point out the scannable QR code and the **256-bit SHA-256 On-Chain Commitment**.
+   - **Patient Full Name:** `Kavita Deshmukh`
+   - **Medication Name:** `Azithromycin IP`
+   - **Strength / Dosage:** `500mg`
+3. Click **"Sign & Issue Prescription"**.
+4. Point to the **Latest Issued Pass** card on the right showing the QR code (`RX-2026-XXXX`). Expand **"Technical details (cryptographic commitment)"** if you want to show the 256-bit salted SHA-256 hash and 128-bit salt.
+5. Point to the **Issued Prescriptions** table below showing that **Patient Name** (`Rohan Verma`, `Pooja Mehta`, `Sanjay Singhal`, `Kavita Deshmukh`) and **Medication** are joined from the off-chain store, while only the truncated 8-character hash pill (`a9c28f7b…` with one-click copy) is stored on-chain.
+6. Click **`"View Patient Pass →"`** to jump to the **`Patient Pass`** tab. Select `RX-2026-001-ACTIVE — Rohan Verma (Active)` from the top-right selector, point out the QR pass, and click **`"Verify at Pharmacist POS →"`**.
 
 **What to say:**
 > "Now let's look at Module 1: Prescription Authenticity under India's **DPDP Act 2023**. Storing patient names or diagnoses on a blockchain violates health privacy laws. Instead, MedTrust generates a random 128-bit salt, computes `SHA-256(patientId | doctorLicense | drugName | dosage | salt)`, and signs that hash with Dr. Sharma's `secp256r1` ECDSA private key.  
@@ -73,57 +70,56 @@
 
 ---
 
-## 4. Point-of-Sale Atomic Dispense & Attack Interception (4:45 – 7:00)
+## 4. Point-of-Sale 3-Step Verification & Attack Interception (4:45 – 7:00)
 
 **Action:**
-1. Click the **`⚡ Verification Gate`** tab (`PharmacistPOS`).
-2. **Webcam Modal Demo (15 seconds):** Click the green **`Webcam`** button next to Prescription Input to show the centered modal overlay. (If a camera is active, show the live viewfinder; if not, click **"Use Demo Scan (RX-2026-001-ACTIVE)"** or close the modal with `X`).
-3. **Clean Dispense (Scenario A):**
-   - Select the newly issued prescription `RX-2026-XXXX` (for Kavita Deshmukh) from the **"Available on Ledger"** dropdown, and select `BATCH-CIPLA-DEMO-01` from the **"Batches in Network"** dropdown (keep `RX-2026-001-ACTIVE` untouched for a moment so you can click through all preset attack buttons first, OR test presets first!).
-   - *Tip:* Click the **Capstone Scenarios** preset buttons at the top first before consuming `RX-2026-001-ACTIVE`:
-     - Click **`🔴 Replay / Double-Spend`** (`RX-2026-002-REPLAY` + `BATCH-CIPLA-AZI-2026-01`) → Point out `State is Active (Replay Protection)` failing in red and `REPLAY_FRAUD_DETECTED`. Click **"Block & Report Breach to DRA"** to log the incident.
-     - Click **`🔴 Counterfeit Drug Batch`** (`RX-2026-001-ACTIVE` + `BATCH-FAKE-GREY-999`) → Point out `Batch Genesis Exists` failing in red (`COUNTERFEIT_BATCH_DETECTED`). Click **"Block & Report Breach to DRA"**.
-     - Click **`🔴 Broken Custody Chain`** (`RX-2026-001-ACTIVE` + `BATCH-SUN-PCM-2026-99`) → Point out `Unbroken Custody: Verified at Current Pharmacy` failing in red (`BROKEN_CUSTODY_CHAIN`) because the batch is still with Allkem Wholesalers (`DIST-ALLKEM-BHO`). Click **"Block & Report Breach to DRA"**.
-     - Click **`🔴 CDSCO Recalled Batch`** (`RX-2026-001-ACTIVE` + `BATCH-CIPLA-AMX-RECALLED`) → Point out `No Active DRA / CDSCO Recalls` failing in red (`RECALLED_DRUG_BATCH`).
-     - Click **`🔴 Expired Prescription`** (`RX-2026-003-EXPIRED` + `BATCH-CIPLA-AZI-2026-01`) → Point out `EXPIRED_PRESCRIPTION`.
-   - Now click **`🟢 Valid Clean Dispense`** (`RX-2026-001-ACTIVE` + `BATCH-CIPLA-AZI-2026-01`):
-     - Show that all 9 checks across Module 1 and Module 2 turn green (`GATEWAY AUTHORIZED` in `< 1 ms`).
-     - Click **"Authorize & Commit Atomic Dispense"**.
-     - Point out the confetti confirmation, new **Block Height**, and that both `RX-2026-001-ACTIVE` (`Fulfilled`) and `BATCH-CIPLA-AZI-2026-01` (`Dispensed`) transitioned atomically!
-     - Click **"Authorize / Block"** a second time on the exact same pair to show it immediately flips to `REPLAY_FRAUD_DETECTED`!
+1. On the **`Pharmacist POS`** tab, point out the 3-step workflow (`1. Prescription`, `2. Drug Batch`, `3. Verify & Dispense`) and the **Quick Demo Scenarios** bar at the top.
+2. **Camera Modal Demo (15 seconds):** Click the **`Scan Camera`** button inside Card 1 (`1. Prescription`) to show the centered modal overlay. (If a camera is active, show the live viewfinder; if not, click **"Use Demo Prescription (`RX-2026-001-ACTIVE`)"** or close the modal with `X`).
+3. **Test Attack Presets First (before consuming `RX-2026-001-ACTIVE`):**
+   - Click **`Already Used (Replay)`** (`RX-2026-002-REPLAY` + `BATCH-CIPLA-AZI-2026-01`) → Point out Step 3 turning red (`Checks Failed — Cannot Dispense: This prescription was already dispensed and cannot be reused.` with `Code: REPLAY_FRAUD_DETECTED`). Click **"Block & Report to Regulator"** to log the incident and show the red **Blocked — Dispensing Not Allowed** banner.
+   - Click **`Counterfeit Batch`** (`RX-2026-001-ACTIVE` + `BATCH-FAKE-GREY-999`) → Shows *"This batch serial number is not registered on the ledger (suspected counterfeit)."* (`COUNTERFEIT_BATCH_DETECTED`). Click **"Block & Report to Regulator"**.
+   - Click **`Wrong Custody`** (`RX-2026-001-ACTIVE` + `BATCH-SUN-PCM-2026-99`) → Shows *"This drug batch is not in this pharmacy's custody (currently held by DIST-ALLKEM-BHO)."* (`BROKEN_CUSTODY_CHAIN`). Click **"Block & Report to Regulator"**.
+   - Click **`Recalled Batch`** (`RX-2026-001-ACTIVE` + `BATCH-CIPLA-AMX-RECALLED`) → Shows *"This drug batch has an active regulatory recall from CDSCO / DRA."* (`RECALLED_DRUG_BATCH`).
+   - Click **`Expired Rx`** (`RX-2026-003-EXPIRED` + `BATCH-CIPLA-AZI-2026-01`) → Shows *"This prescription has passed its expiration date."* (`EXPIRED_PRESCRIPTION`).
+4. **Valid Clean Dispense:**
+   - Click **`Valid Dispense`** (`RX-2026-001-ACTIVE` + `BATCH-CIPLA-AZI-2026-01`), or select your newly created `RX-2026-XXXX` + `BATCH-CIPLA-DEMO-01`.
+   - Point out Step 3 turning green (`All 9 Checks Passed`). Expand **"Technical details (9 verification checks & latency)"** to briefly show the 4 Module-1 checks and 5 Module-2 checks passing in `< 1 ms`.
+   - Click **"Verify & Dispense Medication"**.
+   - Point out the green **"Approved — Medication Dispensed"** result banner, confetti confirmation, and updated block number.
+   - Click **"Block & Report to Regulator"** on the exact same pair a second time to prove it immediately flips to *"This prescription was already dispensed and cannot be reused"* (`REPLAY_FRAUD_DETECTED`)!
 
 **What to say:**
-> "At the Apollo Pharmacy POS counter, the pharmacist scans both the patient's QR code and the physical drug box. Notice the **Dual-Layer Concurrent Evaluation Matrix**: in under 1 millisecond, it evaluates 4 checks on Module 1 (including real ECDSA signature verification) and 5 checks on Module 2 (genesis existence, recall status, expiry, pharmacy custody, and drug-name match).  
-> Watch what happens when we test our fraud presets: Replay attacks, counterfeit serials, broken custody chains, and expired prescriptions are all blocked before the medication can leave the counter, and each attempt is reported to the regulator.  
-> When we run a valid pair (`RX-2026-001-ACTIVE` + `BATCH-CIPLA-AZI-2026-01`), both states commit atomically in a single block. If the patient tries to use that same QR code 5 seconds later, it is immediately blocked as Replay Fraud."
+> "At the Apollo Pharmacy POS counter, the pharmacist follows three simple steps: scan the prescription, scan the drug box, and dispense. Behind the scenes, the gateway evaluates 9 cryptographic and supply-chain checks in under 1 millisecond.  
+> When an issue occurs—whether replay fraud, a counterfeit serial, broken custody, or a recalled batch—the pharmacist gets an immediate plain-language explanation and blocks the transaction with one click, reporting the attempt to the regulator.  
+> When we run a valid pair (`RX-2026-001-ACTIVE` + `BATCH-CIPLA-AZI-2026-01`), both states update atomically in a single block."
 
 ---
 
-## 5. Regulatory Recall & Audit Trail — DRA Command & Ledger Explorer (7:00 – 8:15)
+## 5. Regulatory Recall & Audit Trail — Regulator (DRA) & Ledger (7:00 – 8:15)
 
 **Action:**
-1. Click the **`🏛️ DRA Command`** tab (`DRAPanel`).
-2. Point to the 4 top KPI cards (**Total Prescriptions**, **Total Batches Tracked**, **Blocked Fraud Incidents**, **Fabric Block Height**) and the **Security Incident & Breach Feed** on the right showing the exact breaches we just triggered at POS.
-3. On the left card (**Broadcast Instant Drug Batch Recall**), enter `BATCH-CIPLA-DEMO-01` (or `BATCH-CIPLA-AZI-2026-01`) and click **"Commit Regulatory Recall to Blockchain"**.
-4. Click the **`⛓️ Ledger`** tab (`LedgerExplorer`).
-5. Point to the **Immutable Block Production Timeline** chart and click on the latest blocks (`ATOMIC_GATEWAY_DISPENSE`, `DRA_BATCH_RECALL_BROADCAST`, `PRESCRIPTION_ISSUED`) to expand their **Previous Block Hash**, **Current Block Hash**, and **CouchDB State Diff JSON payload**.
+1. Click the **`Regulator (DRA)`** tab (or click **`"View Alert in Regulator Panel →"`** from a blocked POS result).
+2. Point to the 4 summary cards (**Prescriptions**, **Drug Batches**, **Security Alerts**, **Block Height**) and the **Security & Fraud Alerts** feed on the right showing the plain-language alerts we just triggered.
+3. On the left card (**Recall a Drug Batch**), pick `BATCH-CIPLA-DEMO-01` (or `BATCH-CIPLA-AZI-2026-01`) from the **"Select Active Batch"** dropdown and click **"Issue Immediate Recall"**.
+4. Click the **`Ledger`** tab.
+5. Point to the **Block Activity** timeline chart, the 8-character truncated block hash pills (with copy buttons), and click on any block row (`Medication Dispensed (POS)`, `Regulatory Batch Recall`, `Prescription Issued`) to expand its full SHA-256 hashes and JSON transaction payload.
 
 **What to say:**
-> "From the CDSCO Regulatory Command Center, regulators see every blocked fraud attempt in real time with the exact pharmacy node, batch ID, and breach code. They can also broadcast an instant recall on any batch, which immediately blocks dispensing across all consortium pharmacies.  
-> In the **Ledger Explorer**, we can inspect every block from Genesis (`#0`) to the latest block, verifying the cryptographic SHA-256 hash links (`prevHash → blockHash`) and the exact transaction payloads."
+> "In the Regulator panel, CDSCO inspectors see every blocked attempt in real time with plain-language descriptions and the technical breach code. They can also issue an immediate recall on any batch with one click.  
+> In the **Ledger** tab, every block from Genesis (`#0`) to the latest block is linked by SHA-256 hashes, and clicking any row reveals the full cryptographic commitment and JSON state diff."
 
 ---
 
-## 6. Empirical Evaluation — Benchmark Suite (8:15 – 9:00)
+## 6. Empirical Evaluation — Benchmarks (8:15 – 9:00)
 
 **Action:**
-1. Click the **`📊 Benchmarks`** tab (`BenchmarkSuite`).
-2. Keep **Iterations / vector** at `25` (150 total simulations across the 6 vectors) and click **"Execute Benchmark Run"**.
+1. Click the **`Benchmarks`** tab.
+2. Keep **Iterations per scenario** at `25` (150 total checks across 6 scenarios) and click **"Run Benchmark"**.
 3. Point to:
-   - **Interception Accuracy:** `100%` (Zero False Positives / Negatives)
+   - **Detection Accuracy:** `100%` (6 / 6 Scenarios)
    - **Avg Verification Latency:** `~0.35 – 0.60 ms`
-   - **Verification Latency Distribution (Avg vs P95)** and **Cryptographic Overhead (ECDSA secp256r1)** bar charts.
-   - **MedTrust vs Traditional PDMP** comparison table below.
+   - **Verification Latency (Avg vs P95 in ms)** and **Cryptographic Overhead (ms)** side-by-side bar charts.
+   - **Scenario Breakdown** table below.
 
 **What to say:**
-> "Finally, our built-in Benchmark Suite runs 150 live iterations across all 6 attack and legitimate vectors. Even with full `secp256r1` ECDSA signature verification and SHA-256 hashing on every check, average gateway evaluation latency is under 1 millisecond with 100% interception accuracy—turning retrospective post-dispense audits into a real-time point-of-sale gate. Thank you—we're happy to take questions."
+> "Finally, our built-in Benchmark Suite runs 150 live iterations across all 6 legitimate and attack scenarios. Even with full `secp256r1` ECDSA signature verification and SHA-256 hashing on every check, average verification latency is under 1 millisecond with 100% detection accuracy—turning post-dispense audits into a real-time point-of-sale gate. Thank you—we're happy to take questions."

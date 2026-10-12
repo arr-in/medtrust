@@ -1,73 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ShieldCheck,
-  ShieldAlert,
-  QrCode,
-  Barcode,
   CheckCircle2,
   XCircle,
-  Clock,
-  Zap,
-  Building2,
-  FileText,
-  AlertTriangle,
-  Camera
+  Camera,
+  ArrowRight
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { previewGatewayCheck, dispenseGateway } from '../services/api';
 import WebcamScannerModal from './WebcamScannerModal';
 
-export default function PharmacistPOS({ prescriptions = [], batches = [], onUpdate }) {
+const FRIENDLY_REASONS = {
+  REPLAY_FRAUD_DETECTED: 'This prescription has already been used and cannot be filled again.',
+  EXPIRED_PRESCRIPTION: 'This prescription has passed its expiration date.',
+  PRESCRIPTION_NOT_FOUND: 'No matching prescription was found on the ledger.',
+  INVALID_DOCTOR_SIGNATURE: 'The doctor’s digital signature on this prescription is invalid.',
+  COUNTERFEIT_BATCH_DETECTED: 'This drug batch serial is not registered on the ledger (possible counterfeit).',
+  BATCH_ALREADY_DISPENSED: 'This physical drug package has already been dispensed.',
+  RECALLED_DRUG_BATCH: 'This drug batch has been recalled by the Drug Regulatory Authority (CDSCO).',
+  EXPIRED_DRUG_BATCH: 'This physical drug batch has passed its shelf-life expiry date.',
+  BROKEN_CUSTODY_CHAIN: 'This batch has not been transferred to Apollo Pharmacy (#104) yet.',
+  DRUG_MISMATCH_DETECTED: 'The scanned drug batch does not match the medication on the prescription.',
+};
+
+function getFriendlyReason(breachCode, fallbackReason) {
+  return FRIENDLY_REASONS[breachCode] || fallbackReason || 'Verification checks did not pass.';
+}
+
+export default function PharmacistPOS({ prescriptions = [], batches = [], onUpdate, onNavigate }) {
   const [rxInput, setRxInput] = useState('RX-2026-001-ACTIVE');
   const [batchInput, setBatchInput] = useState('BATCH-CIPLA-AZI-2026-01');
   const pharmacyId = 'PHARM-APOLLO-104';
-  
+
   const [preview, setPreview] = useState(null);
   const [dispenseResult, setDispenseResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [scannerMode, setScannerMode] = useState(null);
 
-  // Scanner modal state
-  const [scannerMode, setScannerMode] = useState(null); // 'rx' | 'batch' | null
-
-  // Quick preset test cases
   const presets = [
     {
-      label: '🟢 Valid Clean Dispense',
+      label: '✓ Valid Dispense',
       rx: 'RX-2026-001-ACTIVE',
       batch: 'BATCH-CIPLA-AZI-2026-01',
-      desc: 'Active Azithromycin Rx + Genuine batch in Apollo Pharmacy custody',
     },
     {
-      label: '🔴 Replay / Double-Spend',
+      label: '✕ Already Used (Replay)',
       rx: 'RX-2026-002-REPLAY',
       batch: 'BATCH-CIPLA-AZI-2026-01',
-      desc: 'Attempting to reuse an already fulfilled prescription',
     },
     {
-      label: '🔴 Counterfeit Drug Batch',
+      label: '✕ Counterfeit Batch',
       rx: 'RX-2026-001-ACTIVE',
       batch: 'BATCH-FAKE-GREY-999',
-      desc: 'Forged batch barcode unrecorded on consortium ledger',
     },
     {
-      label: '🔴 Broken Custody Chain',
+      label: '✕ Wrong Custody',
       rx: 'RX-2026-001-ACTIVE',
       batch: 'BATCH-SUN-PCM-2026-99',
-      desc: 'Genuine batch still recorded with distributor, not delivered to pharmacy',
     },
     {
-      label: '🔴 CDSCO Recalled Batch',
+      label: '✕ Recalled Batch',
       rx: 'RX-2026-001-ACTIVE',
       batch: 'BATCH-CIPLA-AMX-RECALLED',
-      desc: 'Sub-potent batch flagged by Drug Regulatory Authority',
     },
     {
-      label: '🔴 Expired Prescription',
+      label: '✕ Expired Prescription',
       rx: 'RX-2026-003-EXPIRED',
       batch: 'BATCH-CIPLA-AZI-2026-01',
-      desc: 'Prescription validity date has lapsed',
-    }
+    },
   ];
 
   const handleApplyPreset = (preset) => {
@@ -77,7 +76,6 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
     setErrorMsg('');
   };
 
-  // Run live pre-flight check when inputs change
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (!rxInput.trim() || !batchInput.trim()) {
@@ -90,12 +88,12 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
       } catch (err) {
         console.error('Pre-flight check error:', err);
       }
-    }, 250);
+    }, 200);
     return () => clearTimeout(timer);
   }, [rxInput, batchInput, pharmacyId, prescriptions, batches]);
 
-  // Execute atomic dispense
   const handleDispense = async () => {
+    if (!rxInput.trim() || !batchInput.trim()) return;
     setLoading(true);
     setErrorMsg('');
     setDispenseResult(null);
@@ -103,386 +101,307 @@ export default function PharmacistPOS({ prescriptions = [], batches = [], onUpda
     try {
       const res = await dispenseGateway(rxInput.trim(), batchInput.trim(), pharmacyId);
       setDispenseResult(res);
-      if (res.authorized) {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#10B981', '#06B6D4', '#34D399', '#38BDF8'],
-        });
-      }
       if (onUpdate) onUpdate();
     } catch (err) {
-      setErrorMsg(err.message || 'Verification & Dispense Failed');
+      setErrorMsg(err.message || 'Could not complete verification request.');
     } finally {
       setLoading(false);
     }
   };
 
+  const isInputValid = Boolean(rxInput.trim() && batchInput.trim());
+
   return (
-    <div className="pos-terminal-layout">
-      {/* Scanner Modal */}
+    <div className="page-stack">
       <WebcamScannerModal
         isOpen={scannerMode !== null}
         onClose={() => setScannerMode(null)}
-        targetName={scannerMode === 'rx' ? 'Prescription QR Code' : 'Physical Drug Barcode'}
+        targetName={scannerMode === 'rx' ? 'Prescription QR Code' : 'Drug Batch Barcode'}
         onScanSuccess={(val) => {
           if (scannerMode === 'rx') setRxInput(val);
           if (scannerMode === 'batch') setBatchInput(val);
+          setDispenseResult(null);
         }}
       />
 
-      {/* Top Banner: Pharmacy Terminal Identity */}
-      <div className="terminal-header-card">
-        <div className="terminal-id-badge">
-          <div className="pharmacy-icon-box">
-            <Building2 size={20} className="text-emerald" />
-          </div>
-          <div>
-            <div className="terminal-title-row">
-              <h2 className="terminal-title">Point-of-Sale Dual Verification Gate</h2>
-              <span className="badge-pharmacy">Dispensing Terminal #104</span>
-            </div>
-            <p className="terminal-sub">
-              Authenticated Node: <span className="font-mono text-cyan">PHARM-APOLLO-104</span> • Apollo Pharmacy Store #104, Bhawarkua, Indore (Lic: MP-PH-9021-RT)
-            </p>
-          </div>
-        </div>
-        <div className="terminal-mode-indicator">
-          <span className="live-indicator-dot"></span>
-          <span>GATEWAY EVALUATION: ACTIVE</span>
+      <div className="page-header">
+        <div>
+          <h2 className="page-title">Pharmacist Point-of-Sale</h2>
+          <p className="page-subtitle">
+            Verify a patient’s prescription and drug batch together before dispensing • Apollo Pharmacy (#104)
+          </p>
         </div>
       </div>
 
-      {/* Preset Test Scenarios bar */}
+      {/* Quick Demo Presets */}
       <div className="preset-bar">
-        <div className="preset-label">
-          <Zap size={14} className="text-amber" />
-          <span>Capstone Scenarios:</span>
-        </div>
-        <div className="preset-buttons-wrap">
-          {presets.map((p, idx) => (
-            <button
-              key={idx}
-              className="preset-btn"
-              onClick={() => handleApplyPreset(p)}
-              title={p.desc}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        <span className="preset-label">Quick Test Scenarios:</span>
+        {presets.map((p, idx) => (
+          <button
+            key={idx}
+            type="button"
+            className="preset-chip"
+            onClick={() => handleApplyPreset(p)}
+          >
+            {p.label}
+          </button>
+        ))}
       </div>
 
-      {/* Dual Scanner Input Section */}
-      <div className="dual-scan-grid">
-        {/* Module 1 Scanner: Prescription QR */}
-        <div className="scan-card">
-          <div className="scan-card-header">
-            <div className="scan-icon-pill icon-pill-emerald">
-              <QrCode size={18} />
-            </div>
-            <div>
-              <div className="layer-tag">MODULE 1 GATEWAY INPUT</div>
-              <h3 className="scan-card-title">Prescription Authenticity QR</h3>
-            </div>
+      {/* 3-Step Flow Grid */}
+      <div className="grid-3">
+        {/* Step 1: Prescription */}
+        <div className="card">
+          <div className="card-title">
+            <span className="step-badge">1</span>
+            <span>Prescription</span>
           </div>
-          <div className="scan-input-group">
-            <label className="input-field-label">Prescription Transaction ID / Hash</label>
-            <div className="scan-input-row">
-              <div className="input-with-icon scan-input-grow">
-                <FileText size={16} className="input-left-icon" />
-                <input
-                  type="text"
-                  className="text-input font-mono"
-                  placeholder="e.g. RX-2026-001-ACTIVE"
-                  value={rxInput}
-                  onChange={(e) => setRxInput(e.target.value)}
-                />
-              </div>
+
+          <div className="form-group">
+            <label className="field-label" htmlFor="pos-rx-select">Choose from ledger</label>
+            <select
+              id="pos-rx-select"
+              className="select-input"
+              value={prescriptions.some((r) => r.prescriptionId === rxInput) ? rxInput : ''}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setRxInput(e.target.value);
+                  setDispenseResult(null);
+                }
+              }}
+            >
+              <option value="">-- Custom / Scanned ID --</option>
+              {prescriptions.map((r) => (
+                <option key={r.prescriptionId} value={r.prescriptionId}>
+                  {r.prescriptionId} • {r.patientName} ({r.drugName}) [{r.state}]
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="field-label" htmlFor="pos-rx-input">Or enter / scan ID</label>
+            <div className="input-action-row">
+              <input
+                id="pos-rx-input"
+                type="text"
+                className="text-input font-mono"
+                placeholder="e.g. RX-2026-001-ACTIVE"
+                value={rxInput}
+                onChange={(e) => {
+                  setRxInput(e.target.value);
+                  setDispenseResult(null);
+                }}
+              />
               <button
                 type="button"
                 onClick={() => setScannerMode('rx')}
-                className="btn-webcam btn-webcam-emerald"
-                title="Scan Prescription QR via Webcam"
+                className="btn btn-secondary btn-sm"
+                title="Scan Prescription QR"
               >
-                <Camera size={16} />
-                <span>Webcam</span>
+                <Camera size={15} />
+                <span>Scan</span>
               </button>
             </div>
           </div>
-          {/* Quick Select dropdown from seeded Rx */}
-          <div className="quick-select-row">
-            <span className="quick-select-label">Available on Ledger:</span>
+        </div>
+
+        {/* Step 2: Drug Batch */}
+        <div className="card">
+          <div className="card-title">
+            <span className="step-badge">2</span>
+            <span>Drug Batch</span>
+          </div>
+
+          <div className="form-group">
+            <label className="field-label" htmlFor="pos-batch-select">Choose from inventory</label>
             <select
-              className="select-input font-mono"
-              value={rxInput}
-              onChange={(e) => setRxInput(e.target.value)}
+              id="pos-batch-select"
+              className="select-input"
+              value={batches.some((b) => b.batchId === batchInput) ? batchInput : ''}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setBatchInput(e.target.value);
+                  setDispenseResult(null);
+                }
+              }}
             >
-              <option value="">-- Choose Loaded Prescription --</option>
-              {prescriptions.map((r) => (
-                <option key={r.prescriptionId} value={r.prescriptionId}>
-                  {r.prescriptionId} [{r.state}] {r.drugName ? `- ${r.drugName}` : ''}
+              <option value="">-- Custom / Unregistered Serial --</option>
+              {batches.map((b) => (
+                <option key={b.batchId} value={b.batchId}>
+                  {b.batchId} • {b.drugName} ({b.currentCustodianRole})
                 </option>
               ))}
             </select>
           </div>
-          <div className="privacy-badge">
-            <ShieldCheck size={12} className="text-emerald" />
-            <span>Zero PII On-Chain: Salted SHA-256 + ECDSA secp256r1</span>
-          </div>
-        </div>
 
-        {/* Module 2 Scanner: Drug Batch Barcode */}
-        <div className="scan-card">
-          <div className="scan-card-header">
-            <div className="scan-icon-pill icon-pill-cyan">
-              <Barcode size={18} />
-            </div>
-            <div>
-              <div className="layer-tag">MODULE 2 GATEWAY INPUT</div>
-              <h3 className="scan-card-title">Physical Drug Batch Barcode</h3>
-            </div>
-          </div>
-          <div className="scan-input-group">
-            <label className="input-field-label">Physical Drug Batch Serial ID</label>
-            <div className="scan-input-row">
-              <div className="input-with-icon scan-input-grow">
-                <Barcode size={16} className="input-left-icon" />
-                <input
-                  type="text"
-                  className="text-input font-mono"
-                  placeholder="e.g. BATCH-CIPLA-AZI-2026-01"
-                  value={batchInput}
-                  onChange={(e) => setBatchInput(e.target.value)}
-                />
-              </div>
+          <div className="form-group">
+            <label className="field-label" htmlFor="pos-batch-input">Or enter / scan barcode</label>
+            <div className="input-action-row">
+              <input
+                id="pos-batch-input"
+                type="text"
+                className="text-input font-mono"
+                placeholder="e.g. BATCH-CIPLA-AZI-2026-01"
+                value={batchInput}
+                onChange={(e) => {
+                  setBatchInput(e.target.value);
+                  setDispenseResult(null);
+                }}
+              />
               <button
                 type="button"
                 onClick={() => setScannerMode('batch')}
-                className="btn-webcam btn-webcam-cyan"
-                title="Scan Drug Barcode via Webcam"
+                className="btn btn-secondary btn-sm"
+                title="Scan Drug Barcode"
               >
-                <Camera size={16} />
-                <span>Webcam</span>
+                <Camera size={15} />
+                <span>Scan</span>
               </button>
             </div>
           </div>
-          {/* Quick Select dropdown from seeded batches */}
-          <div className="quick-select-row">
-            <span className="quick-select-label">Batches in Network:</span>
-            <select
-              className="select-input font-mono"
-              value={batchInput}
-              onChange={(e) => setBatchInput(e.target.value)}
-            >
-              <option value="">-- Choose Loaded Batch --</option>
-              {batches.map((b) => (
-                <option key={b.batchId} value={b.batchId}>
-                  {b.batchId} ({b.drugName} - {b.currentCustodianRole}: {b.currentCustodianId})
-                </option>
-              ))}
-            </select>
+        </div>
+
+        {/* Step 3: Verify & Dispense */}
+        <div className="card">
+          <div className="card-title">
+            <span className="step-badge">3</span>
+            <span>Verify & Dispense</span>
           </div>
-          <div className="privacy-badge">
-            <Building2 size={12} className="text-cyan" />
-            <span>Custodian match required: PHARM-APOLLO-104</span>
-          </div>
+
+          {preview ? (
+            <div className="form-stack">
+              <div>
+                <span className={`badge ${preview.passed ? 'badge-active' : 'badge-expired'}`}>
+                  {preview.passed ? '✓ Ready to Dispense' : '✕ Verification Issue Detected'}
+                </span>
+                <p className="text-sm text-muted" style={{ marginTop: '8px' }}>
+                  {preview.passed
+                    ? 'Prescription is active and the matching drug batch is verified at this pharmacy.'
+                    : getFriendlyReason(preview.breachCode, preview.failureReason)}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className={`btn btn-lg ${preview.passed ? 'btn-primary' : 'btn-danger'}`}
+                onClick={handleDispense}
+                disabled={loading || !isInputValid}
+              >
+                {loading
+                  ? 'Verifying...'
+                  : preview.passed
+                  ? 'Verify & Dispense Medication'
+                  : 'Attempt Dispense (Log Alert)'}
+              </button>
+            </div>
+          ) : (
+            <div className="empty-state">
+              Select a prescription and a drug batch to run verification.
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Concurrent Gateway Evaluation Breakdown */}
-      {preview && (
-        <div className="verification-checklist-card">
-          <div className="checklist-header">
-            <div className="checklist-title-group">
-              <h3 className="checklist-title">Dual-Layer Concurrent Evaluation Matrix</h3>
-              <span className="latency-badge">
-                <Clock size={12} /> Execution Latency: {preview.latencyMs.toFixed(2)} ms
-              </span>
-            </div>
-            <div className={`status-pill-decision ${preview.passed ? 'pill-passed' : 'pill-failed'}`}>
-              {preview.passed ? (
-                <>
-                  <CheckCircle2 size={16} /> GATEWAY AUTHORIZED
-                </>
-              ) : (
-                <>
-                  <XCircle size={16} /> GATEWAY BLOCKED
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="checklist-columns-grid">
-            {/* Module 1 Checks Column */}
-            <div className="checklist-col">
-              <h4 className="col-header text-emerald">
-                <span>Module 1: Prescription Verification</span>
-              </h4>
-              <ul className="check-list">
-                <li className={`check-item ${preview.prescriptionExists ? 'item-pass' : 'item-fail'}`}>
-                  {preview.prescriptionExists ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                  <span>Prescription Record Found on Ledger</span>
-                </li>
-                <li className={`check-item ${preview.prescriptionActive ? 'item-pass' : 'item-fail'}`}>
-                  {preview.prescriptionActive ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                  <span>State is Active (Replay Protection)</span>
-                </li>
-                <li className={`check-item ${preview.prescriptionNotExpired ? 'item-pass' : 'item-fail'}`}>
-                  {preview.prescriptionNotExpired ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                  <span>Prescription Window Not Expired</span>
-                </li>
-                <li className={`check-item ${preview.doctorSignatureValid ? 'item-pass' : 'item-fail'}`}>
-                  {preview.doctorSignatureValid ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                  <span>Physician ECDSA Signature Validated</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Module 2 Checks Column */}
-            <div className="checklist-col">
-              <h4 className="col-header text-cyan">
-                <span>Module 2: Drug Authenticity & Custody</span>
-              </h4>
-              <ul className="check-list">
-                <li className={`check-item ${preview.batchExists ? 'item-pass' : 'item-fail'}`}>
-                  {preview.batchExists ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                  <span>Batch Genesis Exists (Anti-Counterfeit)</span>
-                </li>
-                <li className={`check-item ${preview.batchNotRecalled ? 'item-pass' : 'item-fail'}`}>
-                  {preview.batchNotRecalled ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                  <span>No Active DRA / CDSCO Recalls</span>
-                </li>
-                <li className={`check-item ${preview.batchNotExpired ? 'item-pass' : 'item-fail'}`}>
-                  {preview.batchNotExpired ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                  <span>Medication Within Shelf Life</span>
-                </li>
-                <li className={`check-item ${preview.custodyChainConsistent ? 'item-pass' : 'item-fail'}`}>
-                  {preview.custodyChainConsistent ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                  <span>Unbroken Custody: Verified at Current Pharmacy</span>
-                </li>
-                <li className={`check-item ${preview.drugMatchesPrescription ? 'item-pass' : 'item-fail'}`}>
-                  {preview.drugMatchesPrescription ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                  <span>Prescribed Medication Matches Physical Batch</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Action Row / Execution Trigger */}
-          <div className="atomic-action-row">
-            {!preview.passed ? (
-              <div className="rejection-callout">
-                <AlertTriangle size={20} className="text-rose" />
-                <div>
-                  <div className="rejection-title">Gate Authorization Prohibited: {preview.breachCode}</div>
-                  <div className="rejection-reason">{preview.failureReason}</div>
-                </div>
-              </div>
-            ) : (
-              <div className="authorization-callout">
-                <CheckCircle2 size={20} className="text-emerald" />
-                <div>
-                  <div className="auth-callout-title">All Dual-Layer Conditions Satisfied</div>
-                  <div className="auth-callout-sub">
-                    Ready to execute atomic state commit: Prescription → Fulfilled & Drug Batch → Dispensed
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <button
-              className={`dispense-btn ${preview.passed ? 'btn-authorize' : 'btn-blocked'}`}
-              onClick={handleDispense}
-              disabled={loading}
-            >
-              {loading ? (
-                'Evaluating on Fabric Peer...'
-              ) : preview.passed ? (
-                <>
-                  <Zap size={18} /> Authorize & Commit Atomic Dispense
-                </>
-              ) : (
-                <>
-                  <ShieldAlert size={18} /> Block & Report Breach to DRA
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Final Commit / Result Feedback Card */}
+      {/* Big Clear Result Card after Dispense */}
       {dispenseResult && (
-        <div className={`result-card ${dispenseResult.authorized ? 'result-success' : 'result-error'}`}>
-          <div className="result-header">
-            {dispenseResult.authorized ? (
-              <ShieldCheck size={28} className="text-emerald" />
-            ) : (
-              <ShieldAlert size={28} className="text-rose" />
-            )}
-            <div>
-              <h3 className="result-title">
-                {dispenseResult.authorized
-                  ? 'ATOMIC DISPENSE AUTHORIZED & COMMITTED'
-                  : 'DISPENSE REJECTED — SECURITY BREACH FLAGGED'}
-              </h3>
-              <p className="result-msg">{dispenseResult.message || dispenseResult.error}</p>
+        <div className={`verdict-banner ${dispenseResult.authorized ? 'verdict-approved' : 'verdict-blocked'}`}>
+          <div className="verdict-main-row">
+            <div className="verdict-headline">
+              {dispenseResult.authorized ? <CheckCircle2 size={26} /> : <XCircle size={26} />}
+              <div>
+                <div className="verdict-title">
+                  {dispenseResult.authorized
+                    ? 'Approved — Medication Dispensed'
+                    : 'Blocked — Dispensing Not Allowed'}
+                </div>
+                <div className="verdict-reason">
+                  {dispenseResult.authorized
+                    ? 'Prescription marked as Fulfilled and drug batch marked as Dispensed in a single atomic update.'
+                    : getFriendlyReason(dispenseResult.breachCode, dispenseResult.error)}
+                </div>
+                {!dispenseResult.authorized && dispenseResult.breachCode && (
+                  <div className="verdict-code">
+                    Code: {dispenseResult.breachCode} • Reported to Regulator (DRA)
+                  </div>
+                )}
+              </div>
             </div>
+
+            {onNavigate && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => onNavigate(dispenseResult.authorized ? 'ledger' : 'dra')}
+              >
+                <span>{dispenseResult.authorized ? 'View Block in Ledger' : 'View Alert in Regulator Panel'}</span>
+                <ArrowRight size={14} />
+              </button>
+            )}
           </div>
 
           {dispenseResult.authorized && dispenseResult.commitResult && (
-            <div className="result-meta-grid">
-              <div className="meta-cell">
-                <span className="meta-cell-label">Transaction ID</span>
-                <span className="meta-cell-val font-mono text-cyan">
-                  {dispenseResult.commitResult.txId}
-                </span>
+            <details className="tech-details">
+              <summary>Transaction & block details</summary>
+              <div className="tech-details-body">
+                <div><strong>Block:</strong> #{dispenseResult.commitResult.blockHeight}</div>
+                <div><strong>Transaction ID:</strong> <span className="font-mono">{dispenseResult.commitResult.txId}</span></div>
+                <div><strong>Block Hash:</strong> <span className="font-mono">{dispenseResult.commitResult.blockHash.slice(0, 16)}...</span></div>
               </div>
-              <div className="meta-cell">
-                <span className="meta-cell-label">Block Height</span>
-                <span className="meta-cell-val font-mono">
-                  #{dispenseResult.commitResult.blockHeight}
-                </span>
-              </div>
-              <div className="meta-cell">
-                <span className="meta-cell-label">Prescription State</span>
-                <span className="meta-cell-val text-emerald font-semibold">
-                  Fulfilled (Immutable)
-                </span>
-              </div>
-              <div className="meta-cell">
-                <span className="meta-cell-label">Drug Batch State</span>
-                <span className="meta-cell-val text-emerald font-semibold">
-                  Dispensed to Patient
-                </span>
-              </div>
-              <div className="meta-cell full-width">
-                <span className="meta-cell-label">Block Hash</span>
-                <span className="meta-cell-val font-mono text-muted">
-                  {dispenseResult.commitResult.blockHash}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {!dispenseResult.authorized && (
-            <div className="breach-alert-box">
-              <div className="breach-badge">BREACH CODE: {dispenseResult.breachCode}</div>
-              <p className="breach-notice">
-                Incident logged to DRA Central Oversight. Pharmacist prevented from releasing medication.
-              </p>
-            </div>
+            </details>
           )}
         </div>
       )}
 
       {errorMsg && (
-        <div className="global-error-banner">
-          <AlertTriangle size={18} />
+        <div className="feedback-box feedback-error">
           <span>{errorMsg}</span>
         </div>
+      )}
+
+      {/* Collapsible Technical Verification Details (Closed by Default) */}
+      {preview && (
+        <details className="tech-details">
+          <summary>
+            Technical details (9 verification checks • {preview.latencyMs.toFixed(2)} ms)
+          </summary>
+          <div className="tech-details-body">
+            <div className="check-grid-2">
+              <div className={`check-row ${preview.prescriptionExists ? 'check-pass' : 'check-fail'}`}>
+                {preview.prescriptionExists ? '✓' : '✕'} Prescription exists on ledger
+              </div>
+              <div className={`check-row ${preview.batchExists ? 'check-pass' : 'check-fail'}`}>
+                {preview.batchExists ? '✓' : '✕'} Batch registered by manufacturer
+              </div>
+              <div className={`check-row ${preview.prescriptionActive ? 'check-pass' : 'check-fail'}`}>
+                {preview.prescriptionActive ? '✓' : '✕'} Prescription is unused (Active)
+              </div>
+              <div className={`check-row ${preview.batchNotRecalled ? 'check-pass' : 'check-fail'}`}>
+                {preview.batchNotRecalled ? '✓' : '✕'} Batch has no active recall
+              </div>
+              <div className={`check-row ${preview.prescriptionNotExpired ? 'check-pass' : 'check-fail'}`}>
+                {preview.prescriptionNotExpired ? '✓' : '✕'} Prescription is within valid dates
+              </div>
+              <div className={`check-row ${preview.batchNotExpired ? 'check-pass' : 'check-fail'}`}>
+                {preview.batchNotExpired ? '✓' : '✕'} Drug batch is within shelf life
+              </div>
+              <div className={`check-row ${preview.doctorSignatureValid ? 'check-pass' : 'check-fail'}`}>
+                {preview.doctorSignatureValid ? '✓' : '✕'} Doctor’s ECDSA signature verified
+              </div>
+              <div className={`check-row ${preview.custodyChainConsistent ? 'check-pass' : 'check-fail'}`}>
+                {preview.custodyChainConsistent ? '✓' : '✕'} Batch custody is at this pharmacy
+              </div>
+              <div className={`check-row ${preview.drugMatchesPrescription ? 'check-pass' : 'check-fail'}`}>
+                {preview.drugMatchesPrescription ? '✓' : '✕'} Prescribed drug matches batch drug
+              </div>
+            </div>
+            {preview.breachCode && (
+              <div className="font-mono text-xs" style={{ marginTop: '4px' }}>
+                Technical status code: {preview.breachCode}
+              </div>
+            )}
+          </div>
+        </details>
       )}
     </div>
   );

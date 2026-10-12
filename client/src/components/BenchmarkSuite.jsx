@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Gauge, Play, CheckCircle2, Cpu, BarChart3, Sparkles, TrendingUp } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { getBenchmarkScenarios, runBenchmarkAll } from '../services/api';
 
@@ -8,301 +8,214 @@ export default function BenchmarkSuite() {
   const [iterations, setIterations] = useState(25);
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    getBenchmarkScenarios().then((res) => {
-      setScenarios(res.scenarios || []);
-    });
+    getBenchmarkScenarios()
+      .then((res) => setScenarios(res.scenarios || []))
+      .catch((err) => console.error('Failed to load scenarios:', err));
   }, []);
 
   const handleRunBenchmark = async () => {
     setRunning(true);
-    setResults(null);
+    setErrorMsg('');
     try {
       const data = await runBenchmarkAll(iterations);
       setResults(data);
     } catch (err) {
-      console.error('Benchmark failed:', err);
+      setErrorMsg(err.message || 'Benchmark failed.');
     } finally {
       setRunning(false);
     }
   };
 
-  const chartData = results?.results ? results.results.map(r => ({
-    name: r.name.replace('Scenario ', '').replace('Clean Dispense', 'Clean').replace('Replay Fraud', 'Replay').replace('Counterfeit Batch', 'Counterfeit').replace('Broken Custody', 'Custody').replace('Recalled Drug', 'Recall').replace('Expired Rx', 'Expired'),
-    avgMs: r.latency.avgMs,
-    p95Ms: r.latency.p95Ms,
-    cryptoMs: r.latency.avgCryptoMs,
-    accuracy: r.accuracyPct,
-  })) : [];
+  const chartData = results?.results
+    ? results.results.map((r) => ({
+        name: r.name
+          .replace('Scenario ', '')
+          .replace('Clean Dispense', 'Valid')
+          .replace('Replay Fraud', 'Replay')
+          .replace('Counterfeit Batch', 'Counterfeit')
+          .replace('Broken Custody', 'Custody')
+          .replace('Recalled Drug', 'Recalled')
+          .replace('Expired Rx', 'Expired'),
+        avgMs: r.latency.avgMs,
+        p95Ms: r.latency.p95Ms,
+        cryptoMs: r.latency.avgCryptoMs,
+      }))
+    : [];
+
+  const isIterationsValid = Number.isFinite(iterations) && iterations >= 5 && iterations <= 200;
 
   return (
-    <div className="portal-container">
-      {/* Banner */}
-      <div className="portal-banner">
-        <div className="banner-profile">
-          <div className="avatar-box avatar-benchmark">
-            <Gauge size={24} />
-          </div>
-          <div>
-            <div className="banner-title-row">
-              <h2 className="banner-title">Capstone Evaluation & Benchmarking Suite</h2>
-              <span className="badge-benchmark">Review 2 & 3 Deliverable</span>
-            </div>
-            <p className="banner-sub">
-              Empirical evaluation of dual-layer atomic validation latency, fraud interception accuracy, and DPMP comparative metrics.
-            </p>
-          </div>
+    <div className="page-stack">
+      <div className="page-header">
+        <div>
+          <h2 className="page-title">Performance & Security Benchmarks</h2>
+          <p className="page-subtitle">
+            Test verification speed and fraud detection accuracy across all 6 test scenarios
+          </p>
         </div>
 
-        <div className="benchmark-ctrl-group">
-          <div className="iter-input-wrap">
-            <span className="text-xs text-muted">Iterations / vector:</span>
-            <input
-              type="number"
-              className="text-input font-mono w-16"
-              value={iterations}
-              onChange={(e) => setIterations(Number(e.target.value))}
-              min="5"
-              max="200"
-            />
-          </div>
+        <div className="flex-row">
+          <label className="text-xs text-muted" htmlFor="bench-iterations">Runs per scenario:</label>
+          <input
+            id="bench-iterations"
+            type="number"
+            className="text-input font-mono"
+            style={{ width: '80px' }}
+            value={iterations}
+            onChange={(e) => setIterations(Number(e.target.value))}
+            min="5"
+            max="200"
+          />
           <button
-            className="btn-primary flex-center-gap"
+            type="button"
+            className="btn btn-primary"
             onClick={handleRunBenchmark}
-            disabled={running}
+            disabled={running || !isIterationsValid}
           >
-            {running ? (
-              <>Running Simulation Suite...</>
-            ) : (
-              <>
-                <Play size={16} /> Execute Benchmark Run
-              </>
-            )}
+            <Play size={15} />
+            <span>{running ? 'Running Tests...' : 'Run Benchmark'}</span>
           </button>
         </div>
       </div>
 
-      {/* Summary KPI Cards (If results available) */}
-      {results && (
-        <div className="stats-grid-4">
-          <div className="stat-card">
-            <span className="stat-label">Interception Accuracy</span>
-            <div className="stat-value text-emerald">{results.overallAccuracy}%</div>
-            <span className="stat-sub">Zero False Positives / Negatives</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Avg Verification Latency</span>
-            <div className="stat-value text-cyan font-mono">{results.overallAvgLatencyMs} ms</div>
-            <span className="stat-sub">Includes ECDSA + Hash + Custody</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Simulated Dispense Events</span>
-            <div className="stat-value text-purple font-mono">{results.totalSimulations}</div>
-            <span className="stat-sub">Across 6 Fraud Vectors</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Point-of-Sale Gate Window</span>
-            <div className="stat-value text-emerald">0 ms</div>
-            <span className="stat-sub">Atomic State Commit Protection</span>
-          </div>
+      {errorMsg && (
+        <div className="feedback-box feedback-error">
+          <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* Interactive Charts Section */}
-      {results && chartData.length > 0 && (
-        <div className="two-column-grid mt-6">
-          <div className="panel-card">
-            <div className="panel-header">
-              <TrendingUp size={18} className="text-cyan" />
-              <h3 className="panel-title">Verification Latency Distribution (Avg vs P95)</h3>
-            </div>
-            <div className="chart-box-md">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="name" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" unit="ms" />
-                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
-                  <Legend wrapperStyle={{ color: '#cbd5e1' }} />
-                  <Bar dataKey="avgMs" name="Avg Latency (ms)" fill="#38bdf8" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="p95Ms" name="P95 Latency (ms)" fill="#a855f7" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="panel-card">
-            <div className="panel-header">
-              <BarChart3 size={18} className="text-emerald" />
-              <h3 className="panel-title">Cryptographic Overhead (ECDSA secp256r1)</h3>
-            </div>
-            <div className="chart-box-md">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="name" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" unit="ms" />
-                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
-                  <Legend wrapperStyle={{ color: '#cbd5e1' }} />
-                  <Bar dataKey="cryptoMs" name="ECDSA Verification Time (ms)" fill="#10b981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+      {!results ? (
+        <div className="card">
+          <div className="empty-state">
+            Click <strong>Run Benchmark</strong> above to run {iterations * 6} live verification tests across all 6 scenarios and generate latency charts.
           </div>
         </div>
-      )}
-
-      {/* Latency and Accuracy Matrix */}
-      {results && (
-        <div className="panel-card mt-6">
-          <div className="panel-header">
-            <BarChart3 size={18} className="text-cyan" />
-            <h3 className="panel-title">Vector-by-Vector Benchmarking Results ({results.results.length} Scenarios)</h3>
+      ) : (
+        <>
+          <div className="grid-4">
+            <div className="stat-card">
+              <span className="stat-label">Detection Accuracy</span>
+              <div className="stat-value text-success">{results.overallAccuracy}%</div>
+              <span className="stat-sub">Zero false approvals or blocks</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">Average Latency</span>
+              <div className="stat-value font-mono">{results.overallAvgLatencyMs} ms</div>
+              <span className="stat-sub">Full dual-layer check</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">Total Tests Run</span>
+              <div className="stat-value font-mono">{results.totalSimulations}</div>
+              <span className="stat-sub">{iterations} runs × 6 scenarios</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-label">Enforcement Mode</span>
+              <div className="stat-value">Real-Time</div>
+              <span className="stat-sub">Blocks before dispensing</span>
+            </div>
           </div>
 
-          <div className="table-responsive">
-            <table className="custom-table">
-              <thead>
-                <tr>
-                  <th>Attack / Flow Vector</th>
-                  <th>Expected Action</th>
-                  <th>Accuracy</th>
-                  <th>Min Latency</th>
-                  <th>Avg Latency</th>
-                  <th>P95 Latency</th>
-                  <th>Avg Crypto Time</th>
-                  <th>Interception Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.results.map((r) => (
-                  <tr key={r.scenarioId}>
-                    <td className="font-semibold text-sm">{r.name}</td>
-                    <td>
-                      <span
-                        className={`status-tag ${
-                          r.expected === 'AUTHORIZED' ? 'tag-active' : 'tag-recalled'
-                        }`}
-                      >
-                        {r.expected}
-                      </span>
-                    </td>
-                    <td className="text-emerald font-bold font-mono">{r.accuracyPct}%</td>
-                    <td className="font-mono text-xs">{r.latency.minMs} ms</td>
-                    <td className="font-mono text-xs text-cyan font-bold">{r.latency.avgMs} ms</td>
-                    <td className="font-mono text-xs">{r.latency.p95Ms} ms</td>
-                    <td className="font-mono text-xs text-purple">{r.latency.avgCryptoMs} ms</td>
-                    <td>
-                      <span className="pill-intercept">
-                        <CheckCircle2 size={13} className="text-emerald" />
-                        <span className="font-mono text-xs">{r.sampleCode}</span>
-                      </span>
-                    </td>
+          <div className="grid-2">
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Verification Latency (Average vs P95)</h3>
+              </div>
+              <div className="chart-box-md">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#CBD5E1" />
+                    <XAxis dataKey="name" stroke="#64748B" />
+                    <YAxis stroke="#64748B" unit="ms" />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="avgMs" name="Avg Latency (ms)" fill="#0284C7" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="p95Ms" name="P95 Latency (ms)" fill="#0D9488" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">ECDSA Signature Verification Time</h3>
+              </div>
+              <div className="chart-box-md">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#CBD5E1" />
+                    <XAxis dataKey="name" stroke="#64748B" />
+                    <YAxis stroke="#64748B" unit="ms" />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="cryptoMs" name="ECDSA Check (ms)" fill="#16A34A" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Scenario Breakdown</h3>
+            </div>
+            <div className="table-wrap">
+              <table className="clean-table">
+                <thead>
+                  <tr>
+                    <th>Scenario</th>
+                    <th>Expected Decision</th>
+                    <th>Accuracy</th>
+                    <th>Avg Latency</th>
+                    <th>P95 Latency</th>
+                    <th>ECDSA Time</th>
+                    <th>Result Code</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {results.results.map((r) => (
+                    <tr key={r.scenarioId}>
+                      <td className="font-semibold">{r.name}</td>
+                      <td>
+                        <span className={`badge ${r.expected === 'AUTHORIZED' ? 'badge-active' : 'badge-recalled'}`}>
+                          {r.expected === 'AUTHORIZED' ? 'Approved' : 'Blocked'}
+                        </span>
+                      </td>
+                      <td className="font-mono font-bold text-success">{r.accuracyPct}%</td>
+                      <td className="font-mono">{r.latency.avgMs} ms</td>
+                      <td className="font-mono">{r.latency.p95Ms} ms</td>
+                      <td className="font-mono">{r.latency.avgCryptoMs} ms</td>
+                      <td className="font-mono text-xs">{r.sampleCode}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* Comparison against Traditional PDMP Table (From Paper Section 2.4 & Section 3) */}
-      <div className="panel-card mt-6">
-        <div className="panel-header">
-          <Sparkles size={18} className="text-amber" />
-          <h3 className="panel-title">MedTrust vs Traditional Prescription Monitoring (PDMP) Systems</h3>
-        </div>
-
-        <div className="table-responsive">
-          <table className="custom-table">
-            <thead>
-              <tr>
-                <th>Evaluation Dimension</th>
-                <th>Traditional PDMP / Database Systems</th>
-                <th>MedTrust Dual-Layer Blockchain Gateway</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="font-semibold text-sm">Temporal Enforcement Window</td>
-                <td className="text-rose text-sm">
-                  Retrospective / Batch Audit (checks occur hours, days, or months post-dispense)
-                </td>
-                <td className="text-emerald text-sm font-semibold">
-                  Point-of-Sale Real-Time Gate (blocks unauthorized dispensing instantaneously)
-                </td>
-              </tr>
-              <tr>
-                <td className="font-semibold text-sm">Dual-Vector Cross-Check</td>
-                <td className="text-rose text-sm">
-                  Disconnected (prescription verification separated from drug batch authenticity)
-                </td>
-                <td className="text-emerald text-sm font-semibold">
-                  Unified Atomic Gateway (evaluates doctor ECDSA signature & physical batch custody together)
-                </td>
-              </tr>
-              <tr>
-                <td className="font-semibold text-sm">State Update Atomicity</td>
-                <td className="text-rose text-sm">
-                  No atomicity guarantee (prescription can be marked filled while drug fails check)
-                </td>
-                <td className="text-emerald text-sm font-semibold">
-                  Atomic State Commit (Rx → Fulfilled AND Drug → Dispensed simultaneously)
-                </td>
-              </tr>
-              <tr>
-                <td className="font-semibold text-sm">Patient Privacy & Regulation</td>
-                <td className="text-rose text-sm">
-                  Full PII stored in central repositories (vulnerable to breaches, DPDP tension)
-                </td>
-                <td className="text-emerald text-sm font-semibold">
-                  Zero PII on-chain: Salted SHA-256 hash (strictly adheres to India's DPDP Act 2023)
-                </td>
-              </tr>
-              <tr>
-                <td className="font-semibold text-sm">Regulator Direct Authority</td>
-                <td className="text-muted text-sm">
-                  Manual query & post-incident revocation
-                </td>
-                <td className="text-emerald text-sm font-semibold">
-                  Cryptographic Recall Authority (DRA Root CA pushes real-time blacklists to active ledger)
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Scenarios Overview */}
-      <div className="panel-card mt-6">
-        <div className="panel-header">
-          <Cpu size={18} className="text-purple" />
-          <h3 className="panel-title">Capstone Test Dataset Matrix (Review 2 Scope)</h3>
-        </div>
-
-        <div className="scenarios-grid">
-          {scenarios.map((sc) => (
-            <div key={sc.id} className="scenario-card">
-              <div className="scenario-card-top">
-                <h4 className="scenario-name">{sc.name}</h4>
-                <span
-                  className={`status-tag ${
-                    sc.expectedOutcome === 'AUTHORIZED' ? 'tag-active' : 'tag-recalled'
-                  }`}
-                >
-                  {sc.expectedOutcome}
-                </span>
+      <details className="tech-details">
+        <summary>Scenario definitions & comparison with traditional databases ({scenarios.length} scenarios)</summary>
+        <div className="tech-details-body">
+          <div className="check-grid-2">
+            {scenarios.map((sc) => (
+              <div key={sc.id} className="check-row" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                <div className="flex-between" style={{ width: '100%' }}>
+                  <strong>{sc.name}</strong>
+                  <span className={`badge ${sc.expectedOutcome === 'AUTHORIZED' ? 'badge-active' : 'badge-recalled'}`}>
+                    {sc.expectedOutcome}
+                  </span>
+                </div>
+                <span className="text-xs text-muted">{sc.description}</span>
+                <span className="font-mono text-xs">Rx: {sc.prescriptionId} • Batch: {sc.batchId}</span>
               </div>
-              <p className="scenario-desc">{sc.description}</p>
-              <div className="scenario-inputs font-mono text-xs">
-                <div>Rx: {sc.prescriptionId}</div>
-                <div>Batch: {sc.batchId}</div>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      </details>
     </div>
   );
 }

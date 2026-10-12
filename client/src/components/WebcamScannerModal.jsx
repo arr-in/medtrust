@@ -161,16 +161,18 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
       <div className="scanner-modal-card">
         <div className="scanner-modal-header">
           <div className="scanner-modal-title">
-            <Camera size={20} />
-            <span>Scan {targetName} via Webcam</span>
+            <Camera size={18} />
+            <span>Scan {targetName}</span>
           </div>
           <button
+            type="button"
             onClick={() => {
               stopScanner().then(onClose);
             }}
             className="scanner-close-btn"
+            aria-label="Close scanner"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
@@ -184,8 +186,10 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
                 startCamera(e.target.value);
               }}
             >
-              {cameras.map(c => (
-                <option key={c.id} value={c.id}>{c.label || `Camera ${c.id.slice(0, 5)}...`}</option>
+              {cameras.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label || `Camera ${c.id.slice(0, 5)}...`}
+                </option>
               ))}
             </select>
           )}
@@ -193,8 +197,8 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
           <button
             type="button"
             onClick={applyAutoTrackFocus}
-            className="btn-webcam btn-webcam-emerald"
-            title="Re-trigger Continuous Focus"
+            className="btn btn-secondary btn-sm"
+            title="Refocus camera"
           >
             <Focus size={14} />
             <span>Refocus</span>
@@ -205,30 +209,23 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
           <div id="webcam-reader-element" className="scanner-reader-region"></div>
           {isStarting && (
             <div className="scanner-loading-overlay">
-              <RefreshCw size={24} className="animate-spin text-emerald" />
-              <span className="text-xs">Initializing Camera Stream...</span>
+              <RefreshCw size={22} className="animate-spin" />
+              <span className="text-xs">Starting camera...</span>
             </div>
           )}
         </div>
 
-        <div className="scanner-status-bar">
-          <span className="scanner-status-label">
-            <Focus size={13} className="text-emerald" /> Auto-Focus Mode:
-          </span>
-          <span className="font-mono text-emerald font-semibold">Continuous Macro (HD 720p)</span>
-        </div>
-
         {errorMsg ? (
           <div className="scanner-error-box">
-            <AlertCircle size={18} className="scanner-error-icon text-rose" />
+            <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
             <div>
-              <div className="font-semibold text-rose">Webcam Notice</div>
+              <div className="font-semibold">Camera Unavailable</div>
               <div>{errorMsg}</div>
               <div className="scanner-fallback-actions">
                 <button
                   type="button"
                   onClick={() => startCamera(selectedCameraId)}
-                  className="scanner-retry-btn"
+                  className="btn btn-secondary btn-sm"
                 >
                   Retry Camera
                 </button>
@@ -243,7 +240,7 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
                       if (onCloseRef.current) onCloseRef.current();
                     });
                   }}
-                  className="scanner-fallback-btn"
+                  className="btn btn-primary btn-sm"
                 >
                   Use Demo Scan ({targetName.toLowerCase().includes('prescription') ? 'RX-2026-001-ACTIVE' : 'BATCH-CIPLA-AZI-2026-01'})
                 </button>
@@ -252,7 +249,7 @@ export default function WebcamScannerModal({ isOpen, onClose, onScanSuccess, tar
           </div>
         ) : (
           <div className="scanner-tip-text">
-            💡 Tip: Hold the QR/barcode 10-15 cm (4-6 inches) away from the camera lens and tap <strong className="text-emerald">Refocus</strong> if needed.
+            Hold the QR code or barcode 10–15 cm from the camera.
           </div>
         )}
       </div>
